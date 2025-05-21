@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registrar Cámaras</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/sections/registrar-camaras.css">
+</head>
+<body>
+    <div class="camaras-container">
+        <!-- TABS/MENÚ -->
+        <div class="tabs-menu">
+            <button class="tab-btn active" id="tabListaBtn">Lista de Cámaras</button>
+            <button class="tab-btn" id="tabRegistrarBtn">Registrar Nueva Cámara</button>
+        </div>
+
+        <div class="tabs-panels">
+            <!-- Panel Lista de Cámaras -->
+            <div class="tab-panel active" id="camarasListaPanel">
+                <h2>Lista de Cámaras</h2>
+                <div class="camaras-table-wrapper">
+                    <table class="camaras-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Ubicación</th>
+                                <th>IP/URL</th>
+                                <th>Estado</th>
+                                <th>Opciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="camarasTableBody">
+                            <!-- Rellenado dinámicamente por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Panel Registrar Nueva Cámara -->
+<div class="tab-panel" id="camarasRegistroPanel">
+    <h2>Registrar Nueva Cámara</h2>
+    <form id="formRegistrarCamara" autocomplete="off">
+        <!-- Campo Nombre -->
+        <div class="row">
+            <label>
+                Nombre:
+                <input type="text" name="nombre" placeholder="Ej: Cámara Principal" maxlength="100">
+            </label>
+            <label>
+                Local:
+                <input type="text" name="local" placeholder="Ej: Oficina Principal" maxlength="100" required>
+            </label>
+        </div>
+
+        <!-- Campo Ubicación -->
+        <div class="row">
+            <label>
+                Ubicación:
+                <input type="text" name="ubicacion" placeholder="Ej: Piso 2, Sala de Juntas" maxlength="255">
+            </label>
+        </div>
+
+        <!-- Campo Tipo de Cámara -->
+        <div class="row">
+            <label>
+                Tipo de Cámara:
+                <select name="tipo_camara" required>
+                    <option value="USB">USB</option>
+                    <option value="IP">IP</option>
+                    <option value="WEB">WEB</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </label>
+        </div>
+
+        <!-- Campo Fuente -->
+        <div class="row">
+            <label>
+                Fuente (IP/URL):
+                <input type="text" name="fuente" placeholder="Ej: http://192.168.1.1/stream" maxlength="255" required>
+            </label>
+        </div>
+
+        <!-- Campo Estado -->
+        <div class="row">
+            <label>
+                Estado:
+                <select name="estado" required>
+                    <option value="Activo">Activo</option>
+                    <option value="Inactivo">Inactivo</option>
+                </select>
+            </label>
+        </div>
+
+        <!-- Botón de Registro -->
+        <button type="submit" class="btn-primary">Registrar Cámara</button>
+    </form>
+</div>
+
+    </div>
+    <script src="../../js/sections/registrar-camaras.js"></script>
+</body>
+</html>

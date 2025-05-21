@@ -1,0 +1,360 @@
+:root {
+    /* Light theme (default) */
+    --bg-color: #f4f4f9;
+    --text-color: #333;
+    --accent-color: #4caf50;
+    --accent-hover: #45a049;
+    --nav-bg: #fff;
+    --nav-active: #e8f5e9;
+    --border-color: #ccc;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --icon-color: #555;
+}
+
+[data-theme="dark"] {
+    /* Dark theme */
+    --bg-color: #1a1a1a;
+    --text-color: #e0e0e0;
+    --accent-color: #45a049;
+    --accent-hover: #4caf50;
+    --nav-bg: #2d2d2d;
+    --nav-active: #1b5e20;
+    --border-color: #444;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --icon-color: #aaa;
+}
+
+/* Global styles with transitions for theme switching */
+* {
+    box-sizing: border-box;
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+}
+
+.content-area {
+    flex: 1;
+    padding: 20px;
+    transition: margin-right 0.35s cubic-bezier(.51,1.37,.37,1.1), width 0.35s cubic-bezier(.51,1.37,.37,1.1);
+    margin-right: 250px; /* Match the width of the side-nav */
+    width: auto;
+}
+
+body.menu-closed .content-area {
+    margin-right: 0 !important;
+    width: 100vw !important;
+}
+body.menu-open .content-area {
+    margin-right: 250px;
+    width: auto;
+}
+
+/* Adjust content area when menu is collapsed */
+.content-area.expanded {
+    margin-right: 70px;
+}
+
+/* Frame for content loading */
+.content-frame {
+    display: none;
+    width: 100%;
+    height: 80vh;
+    border: none;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    background-color: var(--form-bg);
+}
+
+.content-frame.active {
+    display: block;
+    animation: fadeIn 0.5s ease;
+}
+
+/* Main header */
+h1 {
+    color: var(--accent-color);
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+/* Vertical navigation styles */
+.side-nav {
+    width: 250px;
+    height: 100vh;
+    background-color: var(--nav-bg);
+    box-shadow: var(--shadow);
+    position: fixed;
+    right: 0;
+    top: 0;
+    overflow-x: hidden;
+    z-index: 2001;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    transition: right 0.35s cubic-bezier(.51,1.37,.37,1.1);
+}
+
+.side-nav.hide-menu {
+    right: -300px !important;
+    /* Elimina menu visual, deja sólo el toggle flotante */
+}
+
+/* Expanded center option */
+.side-nav.collapsed .nav-item.active {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    justify-content: center;
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.side-nav.collapsed .nav-item.active .nav-icon {
+    color: white;
+    margin-right: 10px;
+}
+
+/* Hide text for non-active items in collapsed mode */
+.side-nav.collapsed .nav-item:not(.active):not(.menu-toggle) .nav-text {
+    display: none;
+}
+
+.hide-if-collapsed {
+    display: none !important;
+}
+
+.side-nav.collapsed .nav-item:not(.active):not(.menu-toggle) {
+    justify-content: center;
+    width: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+}
+
+/* Menu toggle button */
+.menu-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    width: 52px;
+    height: 52px;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    background-color: var(--accent-color);
+    color: white;
+    cursor: pointer;
+    z-index: 4000;
+    box-shadow: 0 6px 25px rgba(76,207,80,.09);
+    font-size: 1.35em;
+    transition: all 0.3s cubic-bezier(.51,1.37,.37,1.1);
+}
+
+.side-nav.collapsed .menu-toggle {
+    display: flex;
+    right: 20px;
+}
+
+.logo-container {
+    text-align: center;
+    padding: 10px 20px 30px 20px;
+}
+
+.logo {
+    color: var(--accent-color);
+    font-size: 24px;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+/* Navigation links */
+.nav-item {
+    display: flex;
+    align-items: center;
+    color: var(--text-color);
+    text-decoration: none;
+    /* flotante/bubble look */
+    margin: 19px auto;
+    border-radius: 30px;
+    background: var(--form-bg);
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
+    box-shadow: 0 5px 22px 0 rgba(76,207,80,0.14);
+    padding: 16px 35px 16px 20px;
+    font-size: 1.05em;
+    min-width: 170px;
+    max-width: 90vw;
+    transition: box-shadow 0.2s, background 0.24s, color 0.18s;
+    z-index: 1;
+}
+
+.nav-item:hover {
+    background-color: var(--accent-color);
+    color: #fff;
+    box-shadow: 0 9px 18px 0 rgba(76,207,80,0.18);
+}
+
+.nav-item.active {
+    background-color: var(--accent-color);
+    color: #fff;
+    font-weight: bold;
+    box-shadow: 0 12px 28px rgba(76,207,80,0.23);
+}
+
+.nav-item:not(:last-child) {
+    margin-bottom: 1.4em;
+}
+
+.nav-icon {
+    margin-right: 18px;
+    width: 28px;
+    text-align: center;
+    font-size: 1.3em;
+    color: var(--icon-color);
+    background: rgba(44,193,101,0.08);
+    border-radius: 50%;
+    padding: 10px;
+    margin-left: 0;
+}
+
+.nav-item:hover .nav-icon,
+.nav-item.active .nav-icon {
+    color: var(--accent-color);
+}
+
+/* Dark mode toggle */
+.theme-toggle {
+    margin-top: auto;
+    padding: 20px;
+    text-align: center;
+}
+
+.theme-switch-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.theme-switch {
+    display: inline-block;
+    height: 34px;
+    position: relative;
+    width: 60px;
+}
+
+.theme-switch input {
+    display: none;
+}
+
+.slider {
+    background-color: #ffd43b;
+    bottom: 0;
+    cursor: pointer;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    transition: .4s;
+    border-radius: 34px;
+    overflow: hidden;
+}
+
+.slider:before {
+    background-color: white;
+    bottom: 4px;
+    content: "";
+    height: 26px;
+    left: 4px;
+    position: absolute;
+    transition: .4s;
+    width: 26px;
+    border-radius: 50%;
+    z-index: 2;
+}
+
+/* Sun icon */
+.slider:after {
+    content: "☀️";
+    position: absolute;
+    top: 5px;
+    left: 8px;
+    font-size: 16px;
+    z-index: 1;
+}
+
+/* Moon icon */
+input:checked + .slider {
+    background-color: #1a237e;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+input:checked + .slider:after {
+    content: "🌙";
+    position: absolute;
+    top: 5px;
+    right: 8px;
+    left: auto;
+    color: #fff;
+    font-size: 16px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .content-area {
+        margin-right: 0 !important;
+        width: 100vw !important;
+        margin-bottom: 0;
+        padding: 10px;
+    }
+    .side-nav {
+        position: fixed;
+        right: 0;
+        width: 90vw;
+        max-width: 98vw;
+        min-width: 160px;
+        top: 0;
+        height: 100vh;
+        background: var(--nav-bg);
+        box-shadow: var(--shadow);
+        flex-direction: column;
+        justify-content: flex-start;
+        overflow-y: auto;
+        padding: 18px 0;
+        z-index: 2001;
+        border-radius: 0 0 0 40px;
+    }
+    .side-nav.hide-menu {
+        right: -99vw !important;
+    }
+    .menu-toggle {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        left: auto;
+        bottom: auto;
+        z-index: 4000;
+    }
+    .nav-item {
+        margin: 19px auto;
+        padding: 15px 22px 15px 17px;
+        border-radius: 28px;
+        font-size: 1.05em;
+    }
+}
+

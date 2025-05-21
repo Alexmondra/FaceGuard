@@ -1,0 +1,16 @@
+flask
+flask_cors
+flask_socketio
+flask_jwt_extended
+mysql-connector-python
+bcrypt
+numpy
+faiss-cpu
+torch
+facenet-pytorch
+torchvision
+pillow
+pytz
+requests
+opencv-python
+Pillow

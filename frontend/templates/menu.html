@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>FaceGuard - Menú</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/menu.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu - FaceGuard</title>
+    <link rel="stylesheet" href="../css/menu.css">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../assets/favicon.png">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="menu-open">
+    <!-- Menu Toggle Button (shows when menu is collapsed) -->
+    <div class="menu-toggle" id="menuToggle">
+        <i class="fas fa-bars"></i>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="content-area" id="contentArea">
+        <h1>FaceGuard Dashboard</h1>
+        
+        <div class="dashboard-content">
+            <!-- Welcome Message (shown initially) -->
+            <div id="welcome-message">
+                <h2>Bienvenido al Sistema de Reconocimiento Facial</h2>
+                <p>Seleccione una opción del menú para comenzar.</p>
+            </div>
+            
+            <!-- Content Frames for each section -->
+            <iframe src="sections/registrar-camaras.html" class="content-frame" id="registrar-camaras-frame"></iframe>
+            <iframe src="sections/ver-camara.html" class="content-frame" id="ver-camara-frame"></iframe>
+            <iframe src="sections/reconocer.html" class="content-frame" id="reconocer-frame"></iframe>
+            <iframe src="sections/registrar-buscados.html" class="content-frame" id="registrar-buscados-frame"></iframe>
+        </div>
+    </div>
+    
+    <!-- Vertical Navigation Bar -->
+    <nav class="side-nav" id="sideNav">
+        <div class="logo-container">
+            <a href="#" class="logo">FaceGuard</a>
+        </div>
+        
+        <a href="#registrar-camaras" class="nav-item" data-section="registrar-camaras">
+            <span class="nav-icon"><i class="fas fa-video"></i></span>
+            <span class="nav-text">Registrar Cámaras</span>
+        </a>
+        
+        <a href="#ver-camara" class="nav-item" data-section="ver-camara">
+            <span class="nav-icon"><i class="fas fa-camera"></i></span>
+            <span class="nav-text">Ver Cámara</span>
+        </a>
+        
+        <a href="#reconocer" class="nav-item" data-section="reconocer">
+            <span class="nav-icon"><i class="fas fa-user-check"></i></span>
+            <span class="nav-text">Reconocer</span>
+        </a>
+        
+        <a href="#registrar-buscados" class="nav-item" data-section="registrar-buscados">
+            <span class="nav-icon"><i class="fas fa-user-plus"></i></span>
+            <span class="nav-text">Registrar Buscad@s</span>
+        </a>
+        
+        <!-- Dark Mode Toggle -->
+        <div class="theme-toggle">
+            <div class="theme-switch-wrapper">
+                <label class="theme-switch" for="checkbox">
+                    <input type="checkbox" id="checkbox" />
+                    <div class="slider"></div>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Logout Link -->
+        <a href="auth.html" class="nav-item logout-item">
+            <span class="nav-icon"><i class="fas fa-sign-out-alt"></i></span>
+            <span class="nav-text">Cerrar Sesión</span>
+        </a>
+    </nav>
+    
+    <!-- Scripts -->
+    <script src="../js/darkMode.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sideNav = document.getElementById('sideNav');
+            const contentArea = document.getElementById('contentArea');
+            const menuToggle = document.getElementById('menuToggle');
+            const navItems = document.querySelectorAll('.nav-item:not(.logout-item)');
+            const welcomeMessage = document.getElementById('welcome-message');
+            const contentFrames = document.querySelectorAll('.content-frame');
+            
+            // Toggle menu expand/collapse
+            menuToggle.addEventListener('click', function() {
+                // Alterna menu oculto/visible sobre la pantalla
+                if (sideNav.classList.contains('hide-menu')) {
+                    sideNav.classList.remove('hide-menu');
+                    // set 'X' icon
+                    menuToggle.querySelector('i').classList.remove('fa-bars');
+                    menuToggle.querySelector('i').classList.add('fa-times');
+                } else {
+                    sideNav.classList.add('hide-menu');
+                    menuToggle.querySelector('i').classList.remove('fa-times');
+                    menuToggle.querySelector('i').classList.add('fa-bars');
+                }
+            });
+            
+            // Handle navigation item clicks
+            navItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Get section identifier
+                    const section = this.getAttribute('data-section');
+                    
+                    // Remove active class from all items
+                    navItems.forEach(navItem => {
+                    navItem.classList.remove('active');
+                });
+                    
+                    // Add active class to clicked item
+                    this.classList.add('active');
+                    // Oculta menú por completo (off-canvas), muestra solo el botón flotante
+                    sideNav.classList.add('hide-menu');
+                    menuToggle.querySelector('i').classList.remove('fa-times');
+                    menuToggle.querySelector('i').classList.add('fa-bars');
+                    // Hide welcome message
+                    welcomeMessage.style.display = 'none';
+                    // Hide all frames
+                    contentFrames.forEach(frame => {
+                        frame.classList.remove('active');
+                    });
+                    
+                    // Show the appropriate frame
+                    const activeFrame = document.getElementById(`${section}-frame`);
+                    if (activeFrame) {
+                        activeFrame.classList.add('active');
+                    }
+                    
+                    // Update URL hash
+                    window.location.hash = section;
+                });
+            });
+            
+            // Check for hash in URL on page load
+            if (window.location.hash) {
+                const section = window.location.hash.substring(1);
+                const navItem = document.querySelector(`.nav-item[data-section="${section}"]`);
+                if (navItem) {
+                    // Trigger click on the corresponding menu item
+                    navItem.click();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

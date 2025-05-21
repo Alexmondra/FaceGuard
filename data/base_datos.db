@@ -1,0 +1,5 @@
+
+mysqldump -h bi5jvmhvdptal2zbnffk-mysql.services.clever-cloud.com -u u8zalsisigiwpqqp -p bi5jvmhvdptal2zbnffk > backup.sql
+
+
+mysql -u root -p tesis < backup.sql

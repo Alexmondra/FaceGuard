@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reconocimiento Facial - FaceGuard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/sections/reconcer.css">
+</head>
+<body>
+    <h2>Reconocimiento Facial</h2>
+    
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="panel">
+                <div class="options-container">
+                    <div class="option-tab active" data-option="upload">
+                        <i class="fas fa-upload"></i> Subir Imagen
+                    </div>
+                    <div class="option-tab" data-option="camera">
+                        <i class="fas fa-camera"></i> Usar Cámara
+                    </div>
+                </div>
+                
+                <div class="option-content active" id="upload-option">
+                    <div class="upload-area" id="dropArea">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <div class="upload-text">
+                            <p>Arrastre y suelte una imagen aquí</p>
+                            <p>o</p>
+                            <button type="button" id="selectFileBtn">
+                                <i class="fas fa-file-image"></i> Seleccionar Archivo
+                            </button>
+                        </div>
+                        <input type="file" id="fileInput" class="upload-input" accept="image/*">
+                    </div>
+                    
+                    <div class="preview-container" id="previewContainer">
+                        <img id="imagePreview" class="image-preview">
+                        <div class="file-info" id="fileInfo"></div>
+                        <button type="button" id="recognizeBtn">
+                            <i class="fas fa-search"></i> Reconocer Rostros
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="option-content" id="camera-option">
+                    <div class="live-view">
+                        <div id="cameraPlaceholder">
+                            <i class="fas fa-camera fa-3x"></i><br>
+                            Haga clic en Iniciar Cámara
+                        </div>
+                        <video id="liveCamera" class="live-feed" style="display: none;" autoplay></video>
+                        
+                        <div class="loading-overlay" id="cameraLoading" style="display: none;">
+                            <div class="spinner"></div>
+                            <div>Iniciando cámara...</div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" id="startCameraBtn">
+                        <i class="fas fa-video"></i> Iniciar Cámara
+                    </button>
+                    <button type="button" id="captureBtn" style="display: none">
+                        <i class="fas fa-camera"></i> Capturar y Reconocer
+                    </button>
+                </div>
+            </div>
+            
+            <div class="panel" id="historyPanel">
+                <h3>Historial de Reconocimiento</h3>
+                <div class="history-list">
+                    <div class="history-item">
+                        <img src="https://dummyimage.com/100x100/000/fff" class="history-thumbnail">
+                        <div class="history-details">
+                            <div class="history-info">3 rostros detectados</div>
+                            <div class="history-time">Hoy, 14:30</div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="history-item">
+                        <img src="https://dummyimage.com/100x100/000/fff" class="history-thumbnail">
+                        <div class="history-details">
+                            <div class="history-info">1 rostro detectado</div>
+                            <div class="history-time">Hoy, 11:15</div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="history-item">
+                        <img src="https://dummyimage.com/100x100/000/fff" class="history-thumbnail">
+                        <div class="history-details">
+                            <div class="history-info">2 rostros detectados</div>
+                            <div class="history-time">Ayer, 16:45</div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="right-panel">
+            <div class="panel" id="resultsPanel">
+                <h3>Resultados del Reconocimiento</h3>
+                
+                <div class="status-indicator processing" id="processingStatus" style="display: none;">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Procesando imagen. Por favor espere...</span>
+                </div>
+                
+                <div class="status-indicator success" id="successStatus" style="display: none;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Reconocimiento completado con éxito</span>
+                </div>
+                
+                <div class="status-indicator error" id="errorStatus" style="display: none;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Error al procesar la imagen</span>
+                </div>
+                
+                <div class="results-container">
+                    <!-- Los resultados se mostrarán aquí dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overlay de carga principal -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <span>Procesando...</span>
+    </div>
+    
+    <!-- Contenedor de mensajes -->
+    <div id="messageContainer" class="message-container"></div>
+
+    <script src="../../js/sections/reconocer.js"></script>
+</body>
+</html>

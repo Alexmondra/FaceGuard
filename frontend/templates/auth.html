@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication - FaceGuard</title>
+    <link rel="stylesheet" href="../css/auth.css">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../assets/favicon.png">
+</head>
+<body>
+    <div class="auth-container">
+        <h1>FaceGuard</h1>
+        
+        <!-- Dark Mode Toggle -->
+        <div class="theme-switch-wrapper">
+            <label class="theme-switch" for="checkbox">
+                <input type="checkbox" id="checkbox" />
+                <div class="slider"></div>
+            </label>
+        </div>
+        
+        <!-- Auth Tabs -->
+        <div class="auth-tabs">
+            <div class="auth-tab active" id="login-tab">Iniciar Sesión</div>
+            <div class="auth-tab" id="register-tab">Registrarse</div>
+        </div>
+        
+        <!-- Login Form -->
+        <div class="form-wrapper active" id="login-form">
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" name="email" required>
+                    <!-- Error message will be inserted here -->
+                </div>
+                
+                <div class="form-group">
+                    <label for="login-password">Contraseña</label>
+                    <input type="password" id="login-password" name="password" required>
+                    <!-- Error message will be inserted here -->
+                </div>
+                
+                <button type="submit">Iniciar Sesión</button>
+                
+                <!-- Success message -->
+                <div class="success-message"></div>
+            </form>
+        </div>
+        
+        <!-- Registration Form -->
+        <div class="form-wrapper" id="register-form">
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="register-username">Nombre de Usuario</label>
+                    <input type="text" id="register-username" name="username" required>
+                    <!-- Error message will be inserted here -->
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-email">Email</label>
+                    <input type="email" id="register-email" name="email" required>
+                    <!-- Error message will be inserted here -->
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-password">Contraseña</label>
+                    <input type="password" id="register-password" name="password" required>
+                    <!-- Error message will be inserted here -->
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-confirm-password">Confirmar Contraseña</label>
+                    <input type="password" id="register-confirm-password" name="confirmPassword" required>
+                    <!-- Error message will be inserted here -->
+                </div>
+                
+                <button type="submit">Crear Cuenta</button>
+                
+                <!-- Success message -->
+                <div class="success-message"></div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="../js/darkMode.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        // Tab switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginTab = document.getElementById('login-tab');
+            const registerTab = document.getElementById('register-tab');
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            
+            loginTab.addEventListener('click', function() {
+                loginTab.classList.add('active');
+                registerTab.classList.remove('active');
+                loginForm.classList.add('active');
+                registerForm.classList.remove('active');
+            });
+            
+            registerTab.addEventListener('click', function() {
+                registerTab.classList.add('active');
+                loginTab.classList.remove('active');
+                registerForm.classList.add('active');
+                loginForm.classList.remove('active');
+            });
+        });
+    </script>
+</body>
+</html>
+

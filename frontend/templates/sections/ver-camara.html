@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ver Cámara - FaceGuard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../css/sections/ver-camara.css">
+</head>
+<body>
+    <h2>Ver Cámara</h2>
+    <!-- Modal Selección de Cámaras -->
+    <div id="multiViewModal" class="modal-overlay" style="display:none;">
+        <div class="modal">
+            <button class="close-modal" id="closeMultiViewModal">&times;</button>
+            <h3>Selecciona las cámaras para la vista múltiple</h3>
+            <form id="multiViewForm">
+                <label><input type="checkbox" name="multiCamera" value="camera1"> Cámara Principal</label><br>
+                <label><input type="checkbox" name="multiCamera" value="camera2"> Cámara Entrada</label><br>
+                <label><input type="checkbox" name="multiCamera" value="camera3"> Cámara Estacionamiento</label><br>
+                <label><input type="checkbox" name="multiCamera" value="camera4"> Cámara Perimetral</label><br>
+                <div style="margin-top:15px;">
+                  <button type="submit" id="applyMultiView" class="btn-primary">Ver</button>
+                </div>
+            </form>
+            <div id="multiViewError" class="error-message" style="display:none;"></div>
+        </div>
+    </div>
+    
+    <div class="camera-controls">
+        <div class="camera-checkboxes">
+            <label><input type="checkbox" value="camera1"> Cámara Principal</label>
+            <label><input type="checkbox" value="camera2"> Cámara Entrada</label>
+            <label><input type="checkbox" value="camera3"> Cámara Estacionamiento</label>
+            <label><input type="checkbox" value="camera4"> Cámara Perimetral</label>
+        </div>
+        
+        <div class="camera-status">
+            <span class="status-indicator status-inactive" id="statusIndicator"></span>
+            <span id="statusText">Inactivo</span>
+        </div>
+        
+        <div class="view-controls">
+            <button id="toggleCameraBtn" class="btn-primary">
+                <i class="fas fa-play"></i>
+            </button>
+            <button id="fullscreenBtn" class="btn-secondary">
+                <i class="fas fa-expand"></i> Pantalla Completa
+            </button>
+            <button id="toggleGridBtn" class="btn-secondary">
+                <i class="fas fa-th"></i> Vista Múltiple
+            </button>
+        </div>
+    </div>
+    
+    <div class="camera-container" id="singleView">
+        <div class="camera-view">
+            <div class="camera-placeholder" id="placeholder">
+                <i class="fas fa-video fa-3x"></i><br>
+                Seleccione una cámara para comenzar
+            </div>
+            <img id="cameraFeed" class="camera-feed" style="display: none;">
+            <video id="liveVideo" class="camera-feed" style="display: none;" autoplay></video>
+            
+            <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+                <div class="spinner"></div>
+                <div id="loadingText">Conectando a la cámara...</div>
+            </div>
+        </div>
+        
+        <div class="error-message" id="errorMessage"></div>
+    </div>
+    
+    <div class="camera-container grid-view" id="gridView">
+        <div id="gridPlaceholder" class="grid-placeholder">
+            Selecciona una o más cámaras para mostrar aquí
+        </div>
+        <!-- Las cámaras seleccionadas se generan dinámicamente desde JS -->
+    </div>
+    <script src="../../js/sections/ver-camara.js"></script>
+</body>
+</html>

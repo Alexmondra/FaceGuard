@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reconocimiento Facial</title>
+    <link rel="stylesheet" href="../css/styles.css" />
+    <script src="https://cdn.socket.io/4.4.0/socket.io.min.js"></script>
+  </head>
+  <body>
+    <h1>Sistema de Reconocimiento Facial</h1>
+
+    <!-- Botones para la acción -->
+    <div>
+      <button id="addImagesButton">Agregar Imágenes</button>
+      <button id="recognizeButton">Reconocer Rostros</button>
+      <button id="liveButton">En Vivo</button>
+    </div>
+
+    <!-- Video en vivo -->
+    <h2>Video en Vivo</h2>
+    <img id="videoFeed" width="640" height="480" style="border: 2px solid black; display: none;" />
+
+    <!-- Formulario para agregar imágenes -->
+    <h2>Agregar Persona</h2>
+    <form id="addPersonForm" style="display: none">
+      <label for="nombre">Nombre:</label>
+      <input type="text" id="nombre" /><br /><br />
+
+      <label for="dni">DNI:</label>
+      <input type="text" id="dni" required /><br /><br />
+
+      <label for="images">Seleccione al menos 1 imagen (máximo 10):</label
+      ><br />
+      <input
+        type="file"
+        id="imageInputs"
+        accept="image/*"
+        multiple
+        required
+      /><br /><br />
+
+      <button type="submit">Agregar Persona</button>
+    </form>
+
+    <!-- Formulario para reconocer rostros -->
+    <h2>Reconocer Rostros</h2>
+    <form id="uploadForm" style="display: none">
+      <label for="fileInput"
+        >Seleccione una imagen o video para reconocimiento:</label
+      >
+      <input type="file" id="fileInput" accept="image/*,video/*" required />
+      <button type="submit">Enviar para Reconocimiento</button>
+    </form>
+
+    </div>
+
+    <!-- Barra de carga -->
+    <div id="loading">
+      <div id="loading-bar"></div>
+    </div>
+
+    <h2>Resultados:</h2>
+    <pre id="results"></pre>
+    <img id="processedImage" style="max-width: 100%; display: none" />
+
+    <script>
+      const serverUrl = "http://127.0.0.1:5000"; // Cambia aquí la URL si es necesario
+      const socket = io.connect(serverUrl, {
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 2000, // Intentar reconectar cada 2 segundos
+        timeout: 20000, // Esperar 20 segundos antes de cerrar por timeout
+        transports: ["websocket"],
+      });
+
+      socket.on("connect", () => {
+        document.body.style.backgroundColor = "lightgreen"; // Indicador visual de conexión activa
+        console.log("Conexión establecida");
+      });
+
+      socket.on("disconnect", () => {
+        console.warn("Conexión perdida. Intentando reconectar...");
+        setTimeout(() => {
+          if (!socket.connected) {
+            socket.connect();
+          }
+        }, 2000); // Intentar reconectar después de 2 segundos
+      });
+
+      socket.on("connect_error", (error) => {
+        console.error("Error de conexión WebSocket:", error);
+      });
+
+      socket.on("disconnect", (reason) => {
+        console.log("WebSocket desconectado:", reason);
+      });
+
+      const resultsElement = document.getElementById("results");
+      const processedImageElement = document.getElementById("processedImage");
+
+      let lastFrame = null;
+
+      socket.on("frame_response", function (data) {
+        if (data.error) {
+          console.error("Error recibido del servidor:", data.error);
+        } else if (data.frame) {
+          if (data.frame === lastFrame) {
+            return; // Evitar redibujar el mismo frame
+          }
+          lastFrame = data.frame;
+
+          console.log("Frame recibido del servidor");
+
+          const img = new Image();
+          img.src = "data:image/jpeg;base64," + data.frame;
+
+          img.onload = () => {
+            const processedCanvas = document.getElementById("processedCanvas");
+            const ctx = processedCanvas.getContext("2d");
+            ctx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+            ctx.drawImage(
+              img,
+              0,
+              0,
+              processedCanvas.width,
+              processedCanvas.height
+            );
+          };
+
+          img.onerror = (err) => {
+            console.error("Error al cargar la imagen procesada:", err);
+          };
+        }
+      });
+
+      document.getElementById("addImagesButton").onclick = () => {
+        document.getElementById("addPersonForm").style.display = "block";
+        document.getElementById("uploadForm").style.display = "none";
+        resultsElement.textContent = "";
+      };
+
+      document.getElementById("recognizeButton").onclick = () => {
+        document.getElementById("addPersonForm").style.display = "none";
+        document.getElementById("uploadForm").style.display = "block";
+        resultsElement.textContent = "";
+      };
+
+      socket.on("video_frame", (data) => {
+        if (data.frame) {
+          document.getElementById("videoFeed").src = "data:image/jpeg;base64," + data.frame;
+          document.getElementById("videoFeed").style.display = "block";
+        }
+      });
+
+      document.getElementById("liveButton").onclick = () => {
+        console.log("Solicitando transmisión de video...");
+        socket.emit("request_video");
+      };
+
+
+
+      document.getElementById("uploadForm").onsubmit = async (event) => {
+  event.preventDefault();
+  resultsElement.textContent = ""; // Limpiar resultados
+
+  const fileInput = document.getElementById("fileInput");
+  const file = fileInput.files[0];
+
+  if (!file) {
+    alert("Seleccione un archivo antes de enviar.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await fetch(`${serverUrl}/reconocer`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error en la respuesta del servidor: ${response.statusText}`);
+    }
+
+    const responseData = await response.json();
+    resultsElement.textContent = JSON.stringify(responseData.resultados, null, 2);
+
+    // Mostrar la imagen procesada
+    if (responseData.imagen) {
+      const imageBlob = new Blob([new Uint8Array(responseData.imagen.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))], { type: 'image/jpeg' });
+      const imageUrl = URL.createObjectURL(imageBlob);
+      processedImageElement.src = imageUrl;
+      processedImageElement.style.display = "block";
+    }
+  } catch (error) {
+    resultsElement.textContent = "Error en la solicitud: " + error.message;
+  }
+};
+
+      document.getElementById("addPersonForm").onsubmit = async (event) => {
+        event.preventDefault();
+        resultsElement.textContent = ""; // Limpiar resultados al iniciar la solicitud
+
+        const nombre = document.getElementById("nombre").value;
+        const dni = document.getElementById("dni").value;
+        const imageInputs = document.getElementById("imageInputs").files;
+
+        if (!dni) {
+          alert("El DNI es obligatorio.");
+          return;
+        }
+
+        if (imageInputs.length === 0) {
+          alert("Debe seleccionar al menos 1 imagen.");
+          return;
+        }
+
+        if (imageInputs.length > 10) {
+          alert("Puede agregar un máximo de 10 imágenes.");
+          return;
+        }
+
+        document.getElementById("loading").style.display = "block";
+        document.getElementById("loading-bar").style.width = "0";
+
+        const loadingInterval = setInterval(() => {
+          const loadingBar = document.getElementById("loading-bar");
+          let width = parseInt(loadingBar.style.width);
+          if (width < 90) {
+            loadingBar.style.width = width + 10 + "%";
+          }
+        }, 300);
+
+        const formData = new FormData();
+        formData.append("nombre", nombre);
+        formData.append("dni", dni);
+
+        for (let i = 0; i < Math.min(imageInputs.length, 10); i++) {
+          formData.append("imagenes[]", imageInputs[i]);
+        }
+
+        try {
+          const response = await fetch(`${serverUrl}/agregar_persona`, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `Error en la respuesta del servidor: ${response.statusText}`
+            );
+          }
+
+          const result = await response.json();
+          resultsElement.textContent = JSON.stringify(result, null, 2);
+        } catch (error) {
+          resultsElement.textContent =
+            "Error en la solicitud: " + error.message;
+        } finally {
+          clearInterval(loadingInterval);
+          document.getElementById("loading-bar").style.width = "100%";
+          setTimeout(() => {
+            document.getElementById("loading").style.display = "none";
+          }, 500);
+        }
+      };
+    </script>
+  </body>
+</html>

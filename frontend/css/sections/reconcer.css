@@ -1,0 +1,337 @@
+:root {
+    --bg-color: #f4f4f9;
+    --text-color: #333;
+    --accent-color: #4caf50;
+    --accent-hover: #45a049;
+    --form-bg: #fff;
+    --border-color: #ccc;
+    --error-color: #e74c3c;
+    --success-color: #2ecc71;
+    --warning-color: #f39c12;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --input-bg: #ffffff;
+}
+
+[data-theme="dark"] {
+    --bg-color: #1a1a1a;
+    --text-color: #e0e0e0;
+    --accent-color: #45a049;
+    --accent-hover: #4caf50;
+    --form-bg: #2d2d2d;
+    --border-color: #444;
+    --error-color: #ff6b6b;
+    --success-color: #5ce096;
+    --warning-color: #ffb142;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --input-bg: #3d3d3d;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 20px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+h2 {
+    color: var(--accent-color);
+    margin-bottom: 20px;
+}
+
+.main-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.left-panel {
+    flex: 1;
+    min-width: 300px;
+}
+
+.right-panel {
+    flex: 1;
+    min-width: 300px;
+}
+
+.panel {
+    background-color: var(--form-bg);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.upload-area {
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: border-color 0.3s;
+}
+
+.upload-area:hover {
+    border-color: var(--accent-color);
+}
+
+.upload-icon {
+    font-size: 48px;
+    color: var(--border-color);
+    margin-bottom: 15px;
+    transition: color 0.3s;
+}
+
+.upload-area:hover .upload-icon {
+    color: var(--accent-color);
+}
+
+.upload-text {
+    margin-bottom: 15px;
+}
+
+.upload-input {
+    display: none;
+}
+
+.preview-container {
+    display: none;
+    margin-top: 20px;
+}
+
+.image-preview {
+    max-width: 100%;
+    max-height: 300px;
+    display: block;
+    margin: 0 auto 15px;
+    border-radius: 4px;
+}
+
+.options-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.option-tab {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    background-color: var(--input-bg);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-weight: bold;
+}
+
+.option-tab.active {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.option-tab:hover {
+    background-color: var(--accent-hover);
+    color: white;
+}
+
+.option-content {
+    display: none;
+}
+
+.option-content.active {
+    display: block;
+    animation: fadeIn 0.5s;
+}
+
+button {
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 15px;
+    transition: background-color 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+button:hover {
+    background-color: var(--accent-hover);
+}
+
+.live-view {
+    width: 100%;
+    height: 300px;
+    background-color: #000;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #777;
+}
+
+.live-feed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 15px 0;
+}
+
+.processing {
+    background-color: rgba(243, 156, 18, 0.1);
+    color: var(--warning-color);
+}
+
+.success {
+    background-color: rgba(46, 204, 113, 0.1);
+    color: var(--success-color);
+}
+
+.error {
+    background-color: rgba(231, 76, 60, 0.1);
+    color: var(--error-color);
+}
+
+.results-container {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.result-item {
+    border-bottom: 1px solid var(--border-color);
+    padding: 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.result-photo {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.result-details {
+    flex: 1;
+}
+
+.result-name {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.result-info {
+    font-size: 14px;
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+.confidence {
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    color: white;
+    background-color: var(--accent-color);
+}
+
+.history-item {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.history-item:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.history-thumbnail {
+    width: 50px;
+    height: 50px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.history-details {
+    flex: 1;
+}
+
+.history-time {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    border-radius: 4px;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 4px solid var(--accent-color);
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .main-container {
+        flex-direction: column;
+    }
+    
+    .upload-area {
+        padding: 20px;
+    }
+    
+    .live-view {
+        height: 250px;
+    }
+}
