@@ -2,22 +2,32 @@ import mysql.connector
 import faiss
 import numpy as np
 import pickle
+import os
 
 def crear_tablas_si_no_existen(conexion):
-    # Ejecuta el SQL solo si la conexión es válida
     try:
-        with open('model/tablas.sql', 'r', encoding='utf-8') as f:
+        # Ruta al archivo SQL
+        ruta_sql = os.path.join(os.path.dirname(__file__), '../models/tablas.sql')
+        with open(ruta_sql, 'r', encoding='utf-8') as f:
             sql_script = f.read()
-        # Divide en sentencias por el ';' y ejecuta sólo las CREATE TABLE
-        sentencias = [s.strip() for s in sql_script.split(';') if s.strip()]
+        
+        # Dividir sentencias de manera más robusta
+        sentencias = sql_script.split(';')
         cursor = conexion.cursor()
+
         for sentencia in sentencias:
-            if sentencia.upper().startswith("CREATE TABLE IF NOT EXISTS"):
-                cursor.execute(sentencia)
+            sentencia = sentencia.strip()
+            if sentencia:
+                try:
+                    cursor.execute(sentencia)
+                except Exception as e:
+                    print(f"Error ejecutando sentencia: {sentencia[:50]}... Error: {e}")
+        
         conexion.commit()
         print("Verificación/creación de tablas completada.")
     except Exception as e:
         print(f"Error al crear/verificar tablas: {e}")
+
 
 def conectar_db():
     try:

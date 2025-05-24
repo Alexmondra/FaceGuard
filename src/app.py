@@ -1,7 +1,6 @@
 import os
-from flask import Flask, send_from_directory
-import webbrowser
-from flask import Flask, request, jsonify
+from flask import Flask, send_from_directory , request, jsonify , abort , render_template
+import webbrowser 
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from flask_jwt_extended import JWTManager
@@ -20,17 +19,11 @@ from datetime import datetime
 import threading
 import webbrowser
 from flask_jwt_extended import jwt_required, get_jwt_identity
-import os
 from conexiondb import conectar_db,crear_tablas_si_no_existen, cargar_embeddings_faiss, faiss_index, indice_persona_id
 from registros import rutas_personas,obtener_datos_persona
 from utils import detect_faces, generar_embedding, mtcnn, facenet, transform_facenet
 from camaras import iniciar_monitoreo, detener_monitoreo, registrar_camara, obtener_camaras_activas, set_socketio, verificar_camaras
-
-# Import the auth blueprint
-
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-
-app = Flask(__name__)
+from login import auth_bp
 
 #creacion de tablas 
 db = conectar_db()
@@ -46,13 +39,6 @@ app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Configurar socketio en el módulo de cámaras
-set_socketio(socketio)
-
 # Configure JWT
 app.config['JWT_SECRET_KEY'] = 'super-secret'  # Change this in production!
 jwt = JWTManager(app)
@@ -60,16 +46,46 @@ jwt = JWTManager(app)
 # Register the auth blueprint
 app.register_blueprint(auth_bp)
 
-def abrir_navegador():
-    ruta_login = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '../frontend/index.html'))
-    webbrowser.open_new(f"file://{ruta_login}")
+
+# Configurar el logger
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
+
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../frontend'))
+
+@app.route('/')
+def root():
+    return send_from_directory(os.path.join(BASE_DIR, 'templates'), 'auth.html')
+
+@app.route('/<path:filename>')
+def serve_html(filename):
+    """Sirve otros archivos HTML desde la carpeta templates."""
+    file_path = os.path.join(BASE_DIR, 'templates', filename)
+    if os.path.isfile(file_path):
+        return send_from_directory(os.path.join(BASE_DIR, 'templates'), filename)
+    else:
+        abort(404)
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    """Sirve archivos JS desde frontend/js/."""
+    return send_from_directory(os.path.join(BASE_DIR, 'js'), filename)
+
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    """Sirve archivos CSS desde frontend/css/."""
+    return send_from_directory(os.path.join(BASE_DIR, 'css'), filename)
 
 # Inicializar FAISS cargando embeddings desde la base de datos
 cargar_embeddings_faiss()
 
 # Iniciar el sistema de monitoreo de cámaras
 iniciar_monitoreo()
-
 # Función de limpieza al cerrar la aplicación
 def cleanup():
     try:
@@ -300,7 +316,7 @@ if __name__ == "__main__":
     try:
         print("Sirviendo desde:", BASE_DIR)
         logger.info("Iniciando servidor FaceGuard con monitoreo de cámaras")
-        webbrowser.open_new("http://localhost:5000/login.html")
+        webbrowser.open_new("http://localhost:5000/")
         socketio.run(app, host='0.0.0.0', port=5000, debug=True)
     except Exception as e:
         logger.error(f"Error al iniciar el servidor: {str(e)}")

@@ -13,4 +13,4 @@ pillow
 pytz
 requests
 opencv-python
-Pillow
+apscheduler
