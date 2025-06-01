@@ -1,375 +1,207 @@
-
-:root {
-    --bg-color: #f4f4f9;
-    --text-color: #333;
-    --accent-color: #4caf50;
-    --accent-hover: #45a049;
-    --form-bg: #fff;
-    --border-color: #ccc;
-    --error-color: #e74c3c;
-    --success-color: #2ecc71;
-    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --input-bg: #ffffff;
-}
-
-[data-theme="dark"] {
-    --bg-color: #1a1a1a;
-    --text-color: #e0e0e0;
-    --accent-color: #45a049;
-    --accent-hover: #4caf50;
-    --form-bg: #2d2d2d;
-    --border-color: #444;
-    --error-color: #ff6b6b;
-    --success-color: #5ce096;
-    --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    --input-bg: #3d3d3d;
-}
-
 body {
     font-family: Arial, sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-color);
     margin: 0;
-    padding: 20px;
-    transition: background-color 0.3s, color 0.3s;
-}
-
-h2 {
-    color: var(--accent-color);
-    margin-bottom: 20px;
+    padding: 0;
+    background-color: #f4f4f9;
+    color: #333;
 }
 
 .camaras-container {
-    margin: 0 auto;
-    max-width: 1000px;
-    background: var(--form-bg);
-    border-radius: 10px;
-    box-shadow: var(--shadow);
-    padding: 0 0 28px 0;
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/*-------- Tabs/Menu superior --------*/
 .tabs-menu {
     display: flex;
-    justify-content: flex-start;
-    border-bottom: 2px solid var(--accent-color);
-    margin-bottom: 0;
-    position: sticky;
-    top: 0;
-    z-index: 8;
-    background: var(--form-bg);
+    justify-content: space-between;
+    margin-bottom: 20px;
 }
+
 .tab-btn {
-    border: none;
-    background: none;
-    outline: none;
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: var(--text-color);
-    padding: 18px 32px 12px 22px;
+    padding: 10px 20px;
     cursor: pointer;
-    border-bottom: 4px solid transparent;
-    transition: border 0.18s, background 0.18s;
-}
-.tab-btn.active, .tab-btn:hover {
-    border-bottom: 4px solid var(--accent-color);
-    background: rgba(76,207,80,0.07);
-}
-
-.tabs-panels {
-    display: flex;
-    flex-direction: column;
-}
-.tab-panel {
-    display: none;
-    padding: 20px 25px 10px 25px;
-    min-height: 120px;
-    animation: fadein .33s;
-}
-.tab-panel.active {
-    display: block;
-}
-@keyframes fadein {
-    0% { opacity: 0; transform: translateY(24px);}
-    100% { opacity: 1; transform: translateY(0);}
-}
-
-/*-------- Tabla de cámaras --------*/
-.camaras-table-wrapper {
-    overflow-x: auto;
-    margin-top: 10px;
-}
-.camaras-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: inherit;
-    min-width: 570px;
-    font-size: 1.07em;
-    margin-top: 0;
-}
-.camaras-table th, .camaras-table td {
-    border-bottom: 1.5px solid var(--border-color);
-    padding: 10px 10px;
-    text-align: left;
-}
-.camaras-table th {
-    background: rgba(74, 207, 80, 0.08);
-    color: var(--accent-color);
-    font-weight: bold;
-    font-size: 1.04em;
-}
-.camaras-table td {
-    vertical-align: middle;
-}
-.estado {
-    font-size: 0.98em;
-    font-weight: bold;
-    padding: 3px 12px;
-    border-radius: 13px;
-    letter-spacing: 0.5px;
-    text-transform: capitalize;
-    background: #ececec;
-    color: #009c42;
-    border: 1px solid #d7eee1;
-}
-.estado.inactiva {
-    background: #fee6e1;
-    color: #c32;
-    border: 1px solid #f6c1bc;
-}
-.op-btn {
-    background: none;
     border: none;
-    border-radius: 50%;
-    padding: 6px 8px;
-    color: var(--text-color);
-    font-size: 1.2em;
-    cursor: pointer;
-    margin-right: 2px;
-    transition: background 0.18s, color 0.22s;
-    outline: none;
-}
-.op-btn.editar-btn {
-    color: #feca57;
-    background: rgba(254,202,87,0.20);
-}
-.op-btn.eliminar-btn {
-    color: #ee5253;
-    background: rgba(238,82,83,0.13);
-}
-.op-btn.editar-btn:hover {
-    background: #fcdca5;
-    color: #f5a623;
-}
-.op-btn.eliminar-btn:hover {
-    background: #ffdbdb;
-    color: #ec090b;
-}
-
-/*-------- Formulario registro --------*/
-#formRegistrarCamara .row {
-    display: flex;
-    gap: 18px;
-    margin-bottom: 14px;
-}
-#formRegistrarCamara label {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    font-weight: bold;
-    color: var(--text-color);
-    font-size: 1em;
-    margin-bottom: 0;
-}
-#formRegistrarCamara input, #formRegistrarCamara select {
-    margin-top: 3px;
-    padding: 9px 10px;
-    border-radius: 5px;
-    border: 1px solid var(--border-color);
-    font-size: 1.01em;
-    background: var(--input-bg);
-    color: var(--text-color);
-    transition: border 0.2s;
-    width: 100%;
-}
-#formRegistrarCamara input:focus, #formRegistrarCamara select:focus {
-    border-color: var(--accent-color);
-    outline: none;
-}
-#formRegistrarCamara button[type="submit"] {
-    margin-top: 17px;
-    padding: 12px 34px;
-    background: var(--accent-color);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: bold;
-    font-size: 1.08em;
-    cursor: pointer;
-    transition: background 0.16s;
-}
-#formRegistrarCamara button[type="submit"]:hover {
-    background: var(--accent-hover);
-}
-@media (max-width: 800px) {
-    .camaras-container {
-        max-width: 99vw;
-        padding: 0 2vw 20px 2vw;
-    }
-    .tab-btn {
-        padding: 14px 10px 8px 10px;
-        font-size: 1em;
-    }
-    .tab-panel {
-        padding: 13px 5vw 13px 5vw;
-    }
-    .camaras-table {
-        font-size: .97em;
-        min-width: 420px;
-    }
-}
-@media (max-width: 600px) {
-    .tabs-menu {
-        flex-direction: column;
-        border-bottom: none;
-    }
-    .tab-btn {
-        width: 100%;
-        border-bottom: none !important;
-        border-right: 4px solid var(--accent-color);
-        text-align: left;
-        padding: 9px 7px 7px 16px;
-        font-size: .99em;
-    }
-    .tab-btn.active, .tab-btn:hover {
-        border-bottom: none;
-        border-right: 4px solid var(--accent-color);
-        background: rgba(76,207,80,0.07);
-    }
-    #formRegistrarCamara .row {
-        flex-direction: column;
-        gap: 7px;
-        margin-bottom: 12px;
-    }
-}
-
-label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
-}
-
-input, select {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid var(--border-color);
+    background: #ddd;
+    font-size: 16px;
     border-radius: 4px;
-    background-color: var(--input-bg);
-    color: var(--text-color);
-    font-size: 1rem;
-}
-
-input:focus, select:focus {
-    outline: none;
-    border-color: var(--accent-color);
-}
-
-button {
-    background-color: var(--accent-color);
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: bold;
     transition: background-color 0.3s;
 }
 
-button:hover {
-    background-color: var(--accent-hover);
+.tab-btn.active {
+    background: #007BFF;
+    color: white;
 }
 
-.camera-list {
-    margin-top: 30px;
+.tab-panel {
+    display: none;
 }
 
-.camera-card {
-    background-color: var(--form-bg);
-    border-radius: 8px;
-    box-shadow: var(--shadow);
-    padding: 15px;
-    margin-bottom: 15px;
+.tab-panel.active {
+    display: block;
+}
+
+.camaras-table-wrapper {
+    overflow-x: auto;
+    margin-top: 20px;
+}
+
+.camaras-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.camaras-table th, .camaras-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.camaras-table th {
+    background: #007BFF;
+    color: white;
+}
+
+.estado {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.estado.activa {
+    background-color: #28a745;
+    color: white;
+}
+
+.estado.inactiva {
+    background-color: #dc3545;
+    color: white;
+}
+
+.op-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 16px;
+    margin: 0 5px;
+    color: #007BFF;
+    transition: color 0.3s;
+}
+
+.op-btn:hover {
+    color: #0056b3;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s, visibility 0.3s;
 }
 
-.camera-info {
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    text-align: left;
+    position: relative;
+}
+
+.close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #333;
+}
+
+.close-btn:hover {
+    color: #000;
+}
+
+.modal:not(.hidden) {
+    visibility: visible;
+    opacity: 1;
+}
+
+.btn-primary {
+    padding: 10px 15px;
+    background: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+form label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+form input, form select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+}
+
+.row label {
     flex: 1;
 }
 
-.camera-actions {
-    display: flex;
-    gap: 10px;
+/* Estados con colores */
+/* Estados con colores de fondo y texto negrita */
+.estado.activo {
+    background-color: #d4edda;
+    color: #155724;
+    font-weight: bold;
+    padding: 5px;
+    border-radius: 5px;
 }
-
-.loading {
-    display: none;
-    text-align: center;
-    margin: 20px 0;
+.estado.inactivo {
+    background-color: #fff3cd;
+    color: #856404;
+    font-weight: bold;
+    padding: 5px;
+    border-radius: 5px;
 }
-
-.loading-spinner {
-    border: 4px solid rgba(0, 0, 0, 0.1);
-    border-left-color: var(--accent-color);
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    animation: spin 1s linear infinite;
-    margin: 0 auto;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.error-message {
-    color: var(--error-color);
-    font-size: 0.9rem;
-    margin-top: 5px;
-    display: none;
-}
-
-.success-message {
-    color: var(--success-color);
-    font-size: 1rem;
-    margin: 15px 0;
-    padding: 10px;
-    border-radius: 4px;
-    background-color: rgba(46, 204, 113, 0.1);
-    display: none;
-}
-
-@media (max-width: 600px) {
-    .form-container {
-        padding: 15px;
-    }
-    
-    button {
-        width: 100%;
-        margin-bottom: 10px;
-    }
-    
-    .camera-card {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    
-    .camera-actions {
-        margin-top: 10px;
-        width: 100%;
-        justify-content: space-between;
-    }
+.estado.desactivado {
+    background-color: #f8d7da;
+    color: #721c24;
+    font-weight: bold;
+    padding: 5px;
+    border-radius: 5px;
 }

@@ -20,9 +20,9 @@ import threading
 import webbrowser
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from conexiondb import conectar_db,crear_tablas_si_no_existen, cargar_embeddings_faiss, faiss_index, indice_persona_id
-from registros import rutas_personas,obtener_datos_persona
+from registros import rutas_personas
 from utils import detect_faces, generar_embedding, mtcnn, facenet, transform_facenet
-from camaras import iniciar_monitoreo, detener_monitoreo, registrar_camara, obtener_camaras_activas, set_socketio, verificar_camaras
+from camaras import rutas_camaras ,iniciar_monitoreo, detener_monitoreo
 from login import auth_bp
 
 #creacion de tablas 
@@ -62,9 +62,13 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../frontend'
 def root():
     return send_from_directory(os.path.join(BASE_DIR, 'templates'), 'auth.html')
 
+@app.route('/sistema')
+def sistema():
+    return send_from_directory(os.path.join(BASE_DIR, 'templates'), 'menu.html')
+
+
 @app.route('/<path:filename>')
 def serve_html(filename):
-    """Sirve otros archivos HTML desde la carpeta templates."""
     file_path = os.path.join(BASE_DIR, 'templates', filename)
     if os.path.isfile(file_path):
         return send_from_directory(os.path.join(BASE_DIR, 'templates'), filename)
@@ -73,29 +77,32 @@ def serve_html(filename):
 
 @app.route('/js/<path:filename>')
 def serve_js(filename):
-    """Sirve archivos JS desde frontend/js/."""
     return send_from_directory(os.path.join(BASE_DIR, 'js'), filename)
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    file_path = os.path.join(BASE_DIR, 'static', filename)
+    if os.path.isfile(file_path):
+        return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
+    else:
+        abort(404)
 
 @app.route('/css/<path:filename>')
 def serve_css(filename):
-    """Sirve archivos CSS desde frontend/css/."""
     return send_from_directory(os.path.join(BASE_DIR, 'css'), filename)
 
 # Inicializar FAISS cargando embeddings desde la base de datos
 cargar_embeddings_faiss()
 
-# Iniciar el sistema de monitoreo de cámaras
-iniciar_monitoreo()
-# Función de limpieza al cerrar la aplicación
-def cleanup():
-    try:
-        detener_monitoreo()
-        logger.info("Sistema de monitoreo de cámaras detenido")
-    except Exception as e:
-        logger.error(f"Error durante la limpieza: {str(e)}")
 
-# Registrar función de limpieza
-atexit.register(cleanup)
+# Registrar el Blueprint de rutas_camaras - rutas_personas
+
+app.register_blueprint(rutas_camaras, url_prefix='/camara')
+app.register_blueprint(rutas_personas, url_prefix='/registros')
+
+
+
+
 
 @app.route('/reconocer', methods=['POST'])
 def reconocer():
@@ -263,62 +270,13 @@ def send_video():
         print("El hilo de transmisión ya está activo.")
 
 
-@app.route('/camaras', methods=['GET'])
-def listar_camaras():
-    """Endpoint para listar todas las cámaras"""
-    try:
-        camaras = obtener_camaras_activas()
-        return jsonify({'camaras': camaras}), 200
-    except Exception as e:
-        logger.error(f"Error al listar cámaras: {str(e)}")
-        return jsonify({'error': 'Error al obtener la lista de cámaras'}), 500
-
-@app.route('/camaras', methods=['POST'])
-def nueva_camara():
-    """Endpoint para registrar una nueva cámara y verificar todas las cámaras"""
-    try:
-        datos_camara = request.json
-        if not datos_camara:
-            return jsonify({'error': 'No se proporcionaron datos de la cámara'}), 400
-        
-        # Validar datos requeridos
-        campos_requeridos = ['nombre', 'local', 'tipo_camara', 'fuente']
-        for campo in campos_requeridos:
-            if campo not in datos_camara:
-                return jsonify({'error': f'Falta el campo requerido: {campo}'}), 400
-        
-        # Registrar la nueva cámara - esto verificará todas las cámaras automáticamente
-        nueva_camara_id = registrar_camara(datos_camara)
-        if nueva_camara_id:
-            return jsonify({
-                'mensaje': 'Cámara registrada exitosamente',
-                'id': nueva_camara_id
-            }), 201
-        else:
-            return jsonify({'error': 'Error al registrar la cámara'}), 500
-            
-    except Exception as e:
-        logger.error(f"Error al registrar nueva cámara: {str(e)}")
-        return jsonify({'error': 'Error interno del servidor'}), 500
-
-@app.route('/camaras/verificar', methods=['POST'])
-def verificar_todas_camaras():
-    """Endpoint para verificar manualmente todas las cámaras"""
-    try:
-        verificar_camaras()
-        return jsonify({'mensaje': 'Verificación de cámaras iniciada correctamente'}), 200
-    except Exception as e:
-        logger.error(f"Error al verificar cámaras: {str(e)}")
-        return jsonify({'error': 'Error al verificar cámaras'}), 500
-
 
 if __name__ == "__main__":
     try:
         print("Sirviendo desde:", BASE_DIR)
-        logger.info("Iniciando servidor FaceGuard con monitoreo de cámaras")
-        webbrowser.open_new("http://localhost:5000/")
+        #webbrowser.open_new("http://localhost:5000/")
         socketio.run(app, host='0.0.0.0', port=5000, debug=True)
     except Exception as e:
         logger.error(f"Error al iniciar el servidor: {str(e)}")
-    finally:
-        cleanup()
+
+

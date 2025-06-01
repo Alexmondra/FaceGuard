@@ -36,8 +36,9 @@
                     </table>
                 </div>
             </div>
+            
 
-            <!-- Panel Registrar Nueva Cámara -->
+     <!-- Panel Registrar Nueva Cámara -->
 <div class="tab-panel" id="camarasRegistroPanel">
     <h2>Registrar Nueva Cámara</h2>
     <form id="formRegistrarCamara" autocomplete="off">
@@ -82,23 +83,61 @@
             </label>
         </div>
 
-        <!-- Campo Estado -->
-        <div class="row">
-            <label>
-                Estado:
-                <select name="estado" required>
-                    <option value="Activo">Activo</option>
-                    <option value="Inactivo">Inactivo</option>
-                </select>
-            </label>
-        </div>
-
         <!-- Botón de Registro -->
         <button type="submit" class="btn-primary">Registrar Cámara</button>
     </form>
 </div>
-
+<div id="editarModal" class="modal hidden">
+    <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <h2>Editar Cámara</h2>
+        <form id="formEditarCamara">
+            <!-- Campo Nombre -->
+            <label>
+                Nombre:
+                <input type="text" name="nombre" id="editarNombre" placeholder="Ej: Cámara Principal" maxlength="100">
+            </label>
+            <!-- Campo Local -->
+            <label>
+                Local:
+                <input type="text" name="local" id="editarLocal" placeholder="Ej: Oficina Principal" maxlength="100">
+            </label>
+            <!-- Campo Ubicación -->
+            <label>
+                Ubicación:
+                <input type="text" name="ubicacion" id="editarUbicacion" placeholder="Ej: Piso 2, Sala de Juntas" maxlength="255">
+            </label>
+            <!-- Campo Tipo de Cámara -->
+            <label>
+                Tipo de Cámara:
+                <select name="tipo_camara" id="editarTipoCamara">
+                    <option value="USB">USB</option>
+                    <option value="IP">IP</option>
+                    <option value="WEB">WEB</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </label>
+            <!-- Campo Fuente -->
+            <label>
+                Fuente (IP/URL):
+                <input type="text" name="fuente" id="editarFuente" placeholder="Ej: http://192.168.1.1/stream" maxlength="255">
+            </label>
+            <!-- Campo Estado -->
+                <label for="editarEstado">Estado:</label>
+                <select id="editarEstado">
+                    <option value="Activo">Activo</option>
+                    <option value="Inactivo">Inactivo</option>
+                    <option value="Desactivado">Desactivado</option>
+                </select>
+            <!-- Botón Guardar -->
+            <button type="submit" class="btn-primary">Guardar Cambios</button>
+        </form>
     </div>
+</div>
+     
+
+
+    <script src="../../js/config.js"></script>
     <script src="../../js/sections/registrar-camaras.js"></script>
 </body>
 </html>

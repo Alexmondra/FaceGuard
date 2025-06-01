@@ -159,10 +159,9 @@
 .op-btn.eliminar-btn:hover {
     background: rgba(231,76,60,0.25);
     color: #fff;
+}
     background: #ececec;
 }
-   
-
 @media (max-width: 800px) {
     .buscados-container {
         padding: 10px 3vw;

@@ -76,7 +76,7 @@
         </div>
         
         <!-- Logout Link -->
-        <a href="auth.html" class="nav-item logout-item">
+        <a href="#" class="nav-item logout-item" id="logoutBtn">
             <span class="nav-icon"><i class="fas fa-sign-out-alt"></i></span>
             <span class="nav-text">Cerrar Sesión</span>
         </a>
@@ -154,7 +154,21 @@
                     navItem.click();
                 }
             }
+            const logoutBtn = document.getElementById('logoutBtn');
+
+            function cerrarSesion() {
+                localStorage.removeItem('accessToken');
+                
+                window.location.href = 'auth.html';
+            }
+    
+            // Asocia el evento click al botón de cerrar sesión
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', cerrarSesion);
+            }
         });
+
+
     </script>
 </body>
 </html>

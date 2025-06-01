@@ -13,6 +13,15 @@ transform_facenet = transforms.Compose([
     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
 ])
 
+def detect_principal_face(image):
+    boxes, _ = mtcnn.detect(image)
+    if boxes is None or len(boxes) == 0:
+        return [] 
+    areas = [(box[2] - box[0]) * (box[3] - box[1]) for box in boxes]
+    max_idx = areas.index(max(areas))  
+    principal_box = boxes[max_idx]
+    return [image.crop(list(map(int, principal_box)))] 
+
 def detect_faces(image):
     boxes, _ = mtcnn.detect(image)
     return [image.crop(list(map(int, box))) for box in boxes] if boxes is not None else []
