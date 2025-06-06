@@ -2,12 +2,12 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registrar Buscados</title>
     <link rel="stylesheet" href="../../css/sections/registrar-buscados.css">
 </head>
 <body>
-    <div class="buscados-container">
-        <h2>Registrados</h2>
+    <div id="personListSection" class="section">
         <div class="buscados-toolbar">
             <input type="text" id="searchInput" placeholder="Buscar por DNI, nombre o apellido..." />
             <button id="addPersonBtn" class="btn-primary">Agregar persona</button>
@@ -33,112 +33,117 @@
         </div>
     </div>
 
-    <div id="imageModal" class="modal-overlay" style="display: none;">
-        <div class="modal modal-medium">
-          <button class="close-modal" id="closeImageModal" title="Cerrar">&times;</button>
-          <h2>Imágenes de Persona</h2>
-          <div id="imageGallery" class="image-gallery">
-              <!-- Las imágenes se cargarán dinámicamente aquí -->
-          </div>
-        </div>
-      </div>
-
-    <!-- FORMULARIO AVANZADO REGISTRAR PERSONA (SOLO EN MODAL) -->
-    <div id="personFormModal" class="modal-overlay" style="display: none;">
-      <div class="modal modal-large">
-        <button class="close-modal" id="closePersonFormModal" title="Cerrar formulario">&times;</button>
-        <h2>Registrar Persona Buscada</h2>
-        <div class="message success-message" id="successMessage">
-            <i class="fas fa-check-circle"></i>
-            <div>Registro completado con éxito. La información ha sido guardada.</div>
-        </div>
-        <div class="message error-message" id="errorMessage">
-            <i class="fas fa-exclamation-circle"></i>
-            <div>Ha ocurrido un error al procesar la solicitud. Por favor, intente nuevamente.</div>
-        </div>
+    <div id="personFormModal" class="section" style="display: none;">
+        <button id="backToListBtn" class="btn-primary" style="display: none;">Volver a la lista</button>
         <form id="personForm">
             <div class="form-container">
                 <div class="form-section">
                     <div class="form-title">Información Personal</div>
-                    
                     <div class="form-row">
                         <label for="fullName">Nombre*</label>
                         <input type="text" id="fullName" name="fullName" required>
                         <div class="field-error" id="fullNameError"></div>
                     </div>
                     <div class="form-row">
-                        <label for="fullName">apellidos Completo *</label>
-                        <input type="text" id="fullName" name="fullName" required>
-                        <div class="field-error" id="fullNameError"></div>
+                        <label for="lastName">Apellidos*</label>
+                        <input type="text" id="lastName" name="lastName" required>
+                        <div class="field-error" id="lastNameError"></div>
                     </div>
-                    
                     <div class="form-row">
                         <label for="idNumber">Número de Identificación*</label>
-                        <input type="text" id="idNumber" name="idNumber" required>
+                        <input type="text" id="idNumber" name="idNumber">
                         <div class="field-error" id="idNumberError"></div>
                     </div>
-                    
                     <div class="form-row">
-                        <label for="birthdate">Fecha de Nacimiento</label>
-                        <input type="date" id="birthdate" name="birthdate">
+                        <label for="idSexo">Sexo*</label>
+                        <input type="text" id="idSexo" name="idSexo" required>
+                        <div class="field-error" id="idSexoError"></div>
                     </div>
-                    
                     <div class="form-row">
-                        <label for="gender">Género</label>
-                        <select id="gender" name="gender">
-                            <option value="">Seleccionar</option>
-                            <option value="male">Masculino</option>
-                            <option value="female">Femenino</option>
-                            <option value="other">Otro</option>
-                        </select>
+                        <label for="idFecha">Fecha nacimiento*</label>
+                        <input type="date" id="idFecha" name="idFecha" required>
+                        <div class="field-error" id="idFechaError"></div>
                     </div>
                 </div>
-                
                 <div class="form-section">
                     <div class="form-title">Fotografías y Descripción</div>
-                    
                     <div class="form-row">
-                        <label>Fotografías*</label>
-                        <div class="photo-upload" id="photoUpload">
-                            <i class="fas fa-camera upload-icon"></i>
-                            <p>Haga clic o arrastre fotos aquí</p>
-                            <p><small>Se requiere al menos una foto clara del rostro</small></p>
-                            <input type="file" id="photoInput" class="upload-input" accept="image/*" multiple>
+                        <label for="photoInput">Fotografías*</label>
+                        <div class="photo-upload">
+                            Arrastra tus fotos aquí o haz clic para seleccionar
+                            <input type="file" id="photoInput" name="photos" accept="image/*" multiple>
                         </div>
                         <div class="field-error" id="photoError"></div>
-                        <div class="photo-preview-container" id="photoPreviewContainer">
-                            <!-- Photo previews will be added here dynamically -->
-                        </div>
                     </div>
-                    
                     <div class="form-row">
                         <label for="physicDescription">Descripción Física</label>
-                        <textarea id="physicDescription" name="physicDescription" placeholder="Altura, peso, características distintivas, etc."></textarea>
+                        <textarea id="physicDescription" name="physicDescription"></textarea>
                     </div>
-                    
-                    
                 </div>
-                
             </div>
             <div class="form-actions">
-                <button type="button" class="reset-btn" id="resetBtn">Limpiar Formulario</button>
-                <button type="submit" class="submit-btn" id="submitBtn">
-                    <i class="fas fa-save"></i> Guardar Registro
-                </button>
+                <button type="reset" class="btn-secondary">Limpiar</button>
+                <button type="submit" class="btn-primary">Guardar</button>
             </div>
         </form>
-        <div class="loading-overlay" id="loadingOverlay">
-            <div class="loading-message">
-                <div class="loading-spinner"></div>
-                <p>Procesando información...</p>
-            </div>
-        </div>
-      </div>
     </div>
+
+    <!-- de aqui estan los modals -->
+
+    <!-- Modal de confirmación -->
+<div id="deleteConfirmModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>¿Estás seguro de eliminar esta persona?</h3>
+        <div>
+            <button id="confirmDeleteBtn" class="btn-danger">Confirmar</button>
+            <button onclick="closeDeleteModal()" class="btn-secondary">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 40%;
+        height: 40%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+    }
+
+    .btn-danger {
+        background-color: red;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin: 10px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+    .btn-secondary {
+        background-color: grey;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin: 10px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+</style>
+
 
     <script src="../../js/config.js"></script>
     <script src="../../js/sections/registrar-buscados.js"></script>
-    
 </body>
 </html>
-
+ 

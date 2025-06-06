@@ -28,6 +28,17 @@ def crear_tablas_si_no_existen(conexion):
     except Exception as e:
         print(f"Error al crear/verificar tablas: {e}")
 
+def poner_camaras_inactivas():
+    conn = conectar_db()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE camaras SET estado = 'Inactivo'")
+        conn.commit()
+        print("Todas las cámaras fueron marcadas como 'Inactivo'.")
+    except Exception as e:
+        print(f"Error actualizando estado de cámaras: {str(e)}")
+    finally:
+        conn.close()
 
 def conectar_db():
     try:
@@ -35,7 +46,7 @@ def conectar_db():
             host='localhost',
             user='root',
             password='root',
-            database='tesis',
+            database='tesis2',
             port=3306
         )
         if conexion.is_connected():

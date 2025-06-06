@@ -15,7 +15,7 @@
             <div class="panel">
                 <div class="options-container">
                     <div class="option-tab active" data-option="upload">
-                        <i class="fas fa-upload"></i> Subir Imagen
+                        <i class="fas fa-upload"id = "subiImg" ></i> Subir Imagen
                     </div>
                     <div class="option-tab" data-option="camera">
                         <i class="fas fa-camera"></i> Usar Cámara
@@ -43,7 +43,7 @@
                         </button>
                     </div>
                 </div>
-                
+                 
                 <div class="option-content" id="camera-option">
                     <div class="live-view">
                         <div id="cameraPlaceholder">
@@ -68,44 +68,13 @@
             </div>
             
             <div class="panel" id="historyPanel">
-                <h3>Historial de Reconocimiento</h3>
-                <div class="history-list">
-                    <div class="history-item">
-                        <img src="https://dummyimage.com/100x100/000/fff" class="history-thumbnail">
-                        <div class="history-details">
-                            <div class="history-info">3 rostros detectados</div>
-                            <div class="history-time">Hoy, 14:30</div>
-                        </div>
-                        <i class="fas fa-chevron-right"></i>
-                    </div>
-                    <div class="history-item">
-                        <img src="https://dummyimage.com/100x100/000/fff" class="history-thumbnail">
-                        <div class="history-details">
-                            <div class="history-info">1 rostro detectado</div>
-                            <div class="history-time">Hoy, 11:15</div>
-                        </div>
-                        <i class="fas fa-chevron-right"></i>
-                    </div>
-                    <div class="history-item">
-                        <img src="https://dummyimage.com/100x100/000/fff" class="history-thumbnail">
-                        <div class="history-details">
-                            <div class="history-info">2 rostros detectados</div>
-                            <div class="history-time">Ayer, 16:45</div>
-                        </div>
-                        <i class="fas fa-chevron-right"></i>
-                    </div>
-                </div>
+                
             </div>
         </div>
         
         <div class="right-panel">
             <div class="panel" id="resultsPanel">
                 <h3>Resultados del Reconocimiento</h3>
-                
-                <div class="status-indicator processing" id="processingStatus" style="display: none;">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <span>Procesando imagen. Por favor espere...</span>
-                </div>
                 
                 <div class="status-indicator success" id="successStatus" style="display: none;">
                     <i class="fas fa-check-circle"></i>
@@ -118,7 +87,7 @@
                 </div>
                 
                 <div class="results-container">
-                    <!-- Los resultados se mostrarán aquí dinámicamente -->
+
                 </div>
             </div>
         </div>
@@ -132,7 +101,8 @@
     
     <!-- Contenedor de mensajes -->
     <div id="messageContainer" class="message-container"></div>
-
+    
+    <script src="../../js/config.js"></script>
     <script src="../../js/sections/reconocer.js"></script>
 </body>
 </html>

@@ -90,10 +90,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Eventos eliminar (pendiente)
         tbody.querySelectorAll('.eliminar-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 const id = btn.getAttribute('data-id');
                 if (confirm(`¿Eliminar cámara ID ${id}?`)) {
-                    alert('Funcionalidad de eliminar pendiente.');
+                    try {
+                        const response = await fetch(`${apiUrl}/eliminar/${id}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': 'Bearer ' + token }
+                        });
+        
+                        if (!response.ok) {
+                            const errorMessage = await response.text();
+                            alert(`Error al eliminar la cámara: ${errorMessage}`);
+                            return;
+                        }
+        
+                        alert('Eliminación completa.');
+                        fetchCamaras(); // Refresca la lista de cámaras
+                    } catch (error) {
+                        console.error('Error al eliminar la cámara:', error);
+                        alert('Hubo un error al eliminar la cámara. Revisa la consola para más detalles.');
+                    }
                 }
             });
         });
