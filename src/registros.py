@@ -1,6 +1,6 @@
-from flask import Blueprint, jsonify, request, send_from_directory
+from flask import Flask, Blueprint, jsonify, request, send_from_directory, current_app
 from conexiondb import conectar_db, faiss_index, indice_persona_id
-from utils import generar_embedding , detect_principal_face
+from utils import generar_embedding, detect_principal_face
 from data import aplicar_aumentaciones
 import os
 from PIL import Image
@@ -8,16 +8,26 @@ from hashlib import sha256
 import pickle
 import numpy as np
 import faiss
-import requests
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from multiprocessing import Pool, cpu_count
+import math
+from io import BytesIO
+from functools import partial
+from werkzeug.utils import secure_filename
+import threading
+import queue
+import time
+from concurrent.futures import ThreadPoolExecutor
+import hashlib
+
 # Crear un Blueprint
-
 rutas_personas = Blueprint('rutas_personas', __name__)
-# Configuración del directorio de imágenes
-IMAGES_DIR = os.path.join(os.path.dirname(__file__), "imagenes_personas")
 
-
-# devuelve datos de las personas esto es para reconocer
+# Configuración del directorio de imágenes (relativa al blueprint)
+IMAGES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "imagenes_personas")
+MAX_WORKERS = 2  # Ajustar según los núcleos del CPU
+processing_queue = queue.Queue()
+executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 def obtener_datos_persona(persona_id):
     conexion = conectar_db()
@@ -28,112 +38,147 @@ def obtener_datos_persona(persona_id):
     print(f"Datos recuperados para ID {persona_id}: {datos}") 
     return datos
 
-
-
-# Crear carpeta para la persona
-def crear_carpeta_persona(dni):
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    carpeta_dni = os.path.join(base_path, 'imagenes_personas', dni)
-    os.makedirs(carpeta_dni, exist_ok=True)
-    return carpeta_dni
-
-# Guardar imágenes y embeddings
-def procesar_imagenes(cursor, persona_id, carpeta_dni, imagenes):
-    contador_imagenes = 1
-    for img in imagenes:
-        ruta_imagen_original = None 
-
+def worker():
+    """Worker que procesa imágenes de la cola indefinidamente"""
+    while True:
         try:
-            # Convertir la imagen a RGB
-            img_pil = Image.open(img.stream).convert("RGB")
+            task_data = processing_queue.get()
+            if task_data is None:  # Señal para terminar
+                break
+            procesar_imagen_async(*task_data)
+        except Exception as e:
+            print(f"Error en worker: {e}")
+        finally:
+            processing_queue.task_done()
 
-            # Aplicar aumentaciones
-            aumentadas = aplicar_aumentaciones(img_pil)
-            embeddings = []
+# Iniciar workers
+for _ in range(MAX_WORKERS):
+    threading.Thread(target=worker, daemon=True).start()
 
-            descripcion_imagen = f"{persona_id}-{contador_imagenes}"
+def crear_carpeta_persona(dni):
+    # Usamos IMAGES_DIR definido a nivel del blueprint
+    carpeta = os.path.join(IMAGES_DIR, secure_filename(dni))
+    os.makedirs(carpeta, exist_ok=True)
+    return carpeta
 
-            for tipo, img_aumentada in aumentadas:
-                # Generar hash único para identificar la imagen
-                nombre_hash = sha256(img_aumentada.tobytes()).hexdigest()
 
-                # Guardar la imagen original en el sistema de archivos
-                if tipo == "original" and ruta_imagen_original is None:
-                    ruta_imagen_original = os.path.join(carpeta_dni, f"{nombre_hash}.jpg")
-                    if not os.path.exists(ruta_imagen_original):
-                        img_aumentada.save(ruta_imagen_original)  # Guardar solo la original.
+def guardar_embedding_db(persona_id, embedding, tipo, descripcion, ruta_imagen):
+    conexion = conectar_db()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO embeddings_personas 
+                (persona_id, embedding, tipo, descripcion, imagen_ruta)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (persona_id, pickle.dumps(embedding), tipo, descripcion, ruta_imagen))
+        conexion.commit()
+    finally:
+        conexion.close()
 
-                # Detectar rostros y generar embeddings
-                for rostro in detect_principal_face(img_aumentada):
+def procesar_imagen_async(img_bytes, persona_id, carpeta_dni, contador_imagenes):
+    try:
+        img_pil = Image.open(BytesIO(img_bytes)).convert("RGB")
+        aumentadas = aplicar_aumentaciones(img_pil)
+        
+        for tipo, img_aumentada in aumentadas:
+            nombre_hash = sha256(img_aumentada.tobytes()).hexdigest()
+            ruta_imagen = os.path.join(carpeta_dni, f"{nombre_hash}.jpg") if tipo == "original" else None
+            
+            if ruta_imagen and not os.path.exists(ruta_imagen):
+                img_aumentada.save(ruta_imagen)
+            
+            rostros = detect_principal_face(img_aumentada)
+            if rostros:
+                for rostro in rostros:
                     embedding = generar_embedding(rostro)
-
-                    ruta_guardada = ruta_imagen_original if tipo == "original" else None
-                    embeddings.append((embedding, tipo, ruta_guardada))
-
-            # Guardar embeddings en la base de datos
-            for embedding, tipo, ruta_imagen in embeddings:
-                cursor.execute("""
-                    INSERT INTO embeddings_personas (persona_id, embedding, tipo, descripcion, imagen_ruta)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (persona_id, pickle.dumps(embedding), tipo, descripcion_imagen, ruta_imagen))
-
-            contador_imagenes += 1
-
-        except Exception as img_err:
-            print(f"Error procesando imagen: {img_err}")
-
-
+                    guardar_embedding_db(
+                        persona_id, 
+                        embedding, 
+                        tipo, 
+                        f"{persona_id}-{contador_imagenes}", 
+                        ruta_imagen
+                    )
+    except Exception as e:
+        print(f"Error procesando imagen: {e}")
 
 @rutas_personas.route("/agregar_persona", methods=["POST"])
 @jwt_required()
-def agregar_persona():
-    conexion = None
+def agregar_persona_async():
+    """Endpoint para registro de personas con procesamiento asíncrono de imágenes"""
     try:
         dni = request.form.get("idNumber", "").strip()
         nombres = request.form.get("fullName", "").strip()
         apellidos = request.form.get("lastName", "").strip()
-        fecha_nacimiento = request.form.get("idFecha", "").strip()
-        genero = request.form.get("idSexo", "").strip()
+        sexo = request.form.get("idSexo", "").strip()
+        fecha_nac = request.form.get("idFecha", "").strip()
         descripcion = request.form.get("physicDescription", "").strip()
-        imagenes = request.files.getlist("photos")
+        
+        
+        
+        if not dni or not nombres:
+            return jsonify({"error": "DNI y nombres son obligatorios"}), 400
 
-        if not dni:
-            return jsonify({"error": "DNI es obligatorio"}), 400
-        if len(genero) != 1:
-            return jsonify({"error": "El género debe ser un carácter (M/F)"}), 400
-        if len(imagenes) == 0:
-            return jsonify({"error": "Debe subir al menos una imagen"}), 400
-
-        conexion = conectar_db()
-        cursor = conexion.cursor()
-
-        cursor.execute("SELECT id FROM personas WHERE dni = %s", (dni,))
-        if cursor.fetchone():
-            return jsonify({"error": "El DNI ya está registrado"}), 400
-
-        cursor.execute("""
-            INSERT INTO personas (dni, nombres, apellidos, fecha_nacimiento, genero, descripcion, fecha_registro)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
-        """, (dni, nombres, apellidos, fecha_nacimiento or None, genero, descripcion))
-
-        persona_id = cursor.lastrowid
-        print(f"Persona creada con ID: {persona_id}")
+        conexion = conectar_db() 
+        try:
+            with conexion.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO personas 
+                    (dni, nombres, apellidos, fecha_nacimiento, genero, descripcion, fecha_registro)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                    RETURNING id
+                """, (dni, nombres, apellidos, fecha_nac, sexo, descripcion))
+                persona_id = cursor.fetchone()[0]
+            conexion.commit()
+        finally:
+            conexion.close()
 
         carpeta_dni = crear_carpeta_persona(dni)
+        
+        imagenes = request.files.getlist("photos")
+        for i, img in enumerate(imagenes, 1):
+            img_bytes = img.read()
+            processing_queue.put((img_bytes, persona_id, carpeta_dni, i))
 
-        procesar_imagenes(cursor, persona_id, carpeta_dni, imagenes)
-
-        conexion.commit()
-        conexion.close()
-
-        return jsonify({"mensaje": "Persona creada exitosamente", "persona_id": persona_id}), 200
+        return jsonify({
+            "status": "success",
+            "message": "Registro iniciado. Las imágenes se están procesando en segundo plano",
+            "persona_id": persona_id,
+            "imagenes_recibidas": len(imagenes),
+            "tiempo_respuesta": f"{time.process_time():.3f} segundos"
+        }), 202
 
     except Exception as e:
-        print(f"Error en /agregar_persona: {e}")
-        if conexion:
-            conexion.rollback()
-            conexion.close()
-        return jsonify({"error": f"Error procesando la solicitud: {str(e)}"}), 500
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## obtener personas :: 
  
@@ -205,6 +250,8 @@ def obtener_personas():
         print(f"Error en /obtener_personas: {e}")
         return jsonify({"error": f"Error procesando la solicitud: {str(e)}"}), 500
 
+#obetener personas
+
 
 @rutas_personas.route('imagenes/<path:filename>')
 def servir_imagenes(filename):
@@ -219,7 +266,7 @@ def servir_imagenes(filename):
     except Exception as e:
         print(f"Error al servir imagen: {e}")
         return jsonify({"error": "Imagen no encontrada"}), 404
-   
+ 
    
 #elimanar persona y sus imagenes :: 
 

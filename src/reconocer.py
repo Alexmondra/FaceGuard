@@ -17,7 +17,7 @@ def reconocer():
         return jsonify({"error": "No se encontró ningún archivo"}), 400
 
     img = Image.open(io.BytesIO(request.files['file'].read())).convert('RGB')
-    img_cv = np.array(img)  # Convert to OpenCV format
+    img_cv = np.array(img) 
     img_cv = cv2.cvtColor(img_cv, cv2.COLOR_RGB2BGR)
 
     rostros = detect_faces(img)
