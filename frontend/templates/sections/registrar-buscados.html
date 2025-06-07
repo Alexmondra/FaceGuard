@@ -9,18 +9,23 @@
 <body>
     <div id="personListSection" class="section">
         <div class="buscados-toolbar">
-            <input type="text" id="searchInput" placeholder="Buscar por DNI, nombre o apellido..." />
-            <button id="addPersonBtn" class="btn-primary">Agregar persona</button>
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Buscar por DNI, nombre o apellido..." />
+            </div>
+            <div class="add-person-container">
+                <button id="addPersonBtn" class="btn-primary">Agregar persona</button>
+            </div>
         </div>
 
         <div class="buscados-table-wrapper">
             <table class="buscados-table">
                 <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Nº</th>
                     <th>DNI</th>
                     <th>Nombre</th>
                     <th>Apellido</th>
+                    <th>Genero</th>
                     <th>Descripción física</th>
                     <th>Foto</th>
                     <th>Opciones</th>
@@ -33,8 +38,8 @@
         </div>
     </div>
 
-    <div id="personFormModal" class="section" style="display: none;">
-        <button id="backToListBtn" class="btn-primary" style="display: none;">Volver a la lista</button>
+    <div id="personFormModal" class="section hidden">
+        <button id="backToListBtn" class="btn-primary back-button">Volver a la lista</button>
         <form id="personForm">
             <div class="form-container">
                 <div class="form-section">
@@ -69,9 +74,13 @@
                     <div class="form-title">Fotografías y Descripción</div>
                     <div class="form-row">
                         <label for="photoInput">Fotografías*</label>
-                        <div class="photo-upload">
-                            Arrastra tus fotos aquí o haz clic para seleccionar
+                        <div class="photo-upload" id="photoUpload">
                             <input type="file" id="photoInput" name="photos" accept="image/*" multiple>
+                            <div id="photoContainer" class="photo-preview-container">
+                                <div class="add-more" id="addMore">
+                                    <span>+</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="field-error" id="photoError"></div>
                     </div>
@@ -82,122 +91,118 @@
                 </div>
             </div>
             <div class="form-actions">
-                <button type="reset" class="btn-secondary">Limpiar</button>
-                <button type="submit" class="btn-primary">Guardar</button>
+                <button type="reset" class="reset-btn">Limpiar</button>
+                <button type="submit" class="submit-btn">Guardar</button>
             </div>
         </form>
     </div>
 
-    <!-- de aqui estan los modals -->
-
     <!-- Modal de confirmación -->
-<div id="deleteConfirmModal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <h3>¿Estás seguro de eliminar esta persona?</h3>
-        <div>
-            <button id="confirmDeleteBtn" class="btn-danger">Confirmar</button>
-            <button onclick="closeDeleteModal()" class="btn-secondary">Cancelar</button>
+    <div id="deleteConfirmModal" class="delete-confirm-modal hidden">
+        <div class="delete-confirm-content">
+            <h3>¿Estás seguro de eliminar esta persona?</h3>
+            <div>
+                <button id="confirmDeleteBtn" class="btn-danger">Confirmar</button>
+                <button id="cancelDeleteBtn" class="btn-secondary">Cancelar</button>
+            </div>
         </div>
     </div>
-</div>
 
-<div id="imageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 1000;">
-    <div id="modalContent" style="background: white; margin: auto; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); max-width: 90%; max-height: 90%; overflow: auto;">
-        <div id="imageGallery" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;"></div>
-        <button id="closeImageModal" style="margin-top: 10px; background: red; color: white; border: none; border-radius: 5px; padding: 10px 20px; cursor: pointer;">Cerrar</button>
+    <!-- Modal de imágenes -->
+    <div id="imageModal" class="image-modal">
+        <div class="image-modal-content">
+            <div id="imageGallery" class="gallery-container"></div>
+            <button id="closeImageModal" class="close-image-modal">Cerrar</button>
+        </div>
     </div>
-</div>
 
-<style>
+        <!-- Modal para editar personas -->
+        <div id="personEditModal" class="modal-edit hidden">
+            <div class="modal-edit-overlay">
+                <div class="modal-edit-content">
+                    <button class="modal-edit-close" onclick="closeEditModal()">×</button>
+                    <h2 class="modal-edit-title">Editar Colaborador</h2>
 
-    #imageModal {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    
-    #modalContent {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-        max-width: 90%;
-        max-height: 90%;
-        overflow: auto;
-        text-align: center;
-    }
-    
-    .gallery-image {
-        width: 100px;
-        height: 100px;
-        object-fit: cover;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: transform 0.2s ease;
-    }
-    
-    .gallery-image:hover {
-        transform: scale(1.1);
-    }
-    
-    #closeImageModal {
-        background: red;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 10px 20px;
-        cursor: pointer;
-        margin-top: 10px;
-        margin-bottom: -20px;
-    }
+                    <form id="editPersonForm" class="edit-form-layout">
+                        <input type="hidden" id="edit-id" name="persona_id">
 
+                        <!-- Columna Izquierda (Datos Personales) -->
+                        <div class="edit-form-left">
+                            <!-- Nombre y Apellidos -->
+                            <div class="edit-form-group">
+                                <label for="edit-name">Nombre*</label>
+                                <input type="text" id="edit-name" name="fullName" required>
+                                <span class="edit-error" id="edit-name-error"></span>
+                            </div>
 
+                            <div class="edit-form-group">
+                                <label for="edit-lastname">Apellidos*</label>
+                                <input type="text" id="edit-lastname" name="lastName" required>
+                                <span class="edit-error" id="edit-lastname-error"></span>
+                            </div>
 
+                            <!-- DNI/Número de Identificación -->
+                            <div class="edit-form-group">
+                                <label for="edit-dni">Número de Identificación*</label>
+                                <input type="text" id="edit-dni" name="idNumber" required>
+                                <span class="edit-error" id="edit-dni-error"></span>
+                            </div>
 
+                            <!-- Sexo (Dropdown M-F) -->
+                            <div class="edit-form-group">
+                                <label for="edit-gender">Sexo*</label>
+                                <select id="edit-gender" name="idSexo" required>
+                                    <option value="">Seleccionar</option>
+                                    <option value="M">Masculino</option>
+                                    <option value="F">Femenino</option>
+                                </select>
+                                <span class="edit-error" id="edit-gender-error"></span>
+                            </div>
 
+                            <!-- Fecha de Nacimiento -->
+                            <div class="edit-form-group">
+                                <label for="edit-birthdate">Fecha de Nacimiento*</label>
+                                <input type="date" id="edit-birthdate" name="idFecha" required>
+                                <span class="edit-error" id="edit-birthdate-error"></span>
+                            </div>
+                        </div>
 
-    .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 40%;
-        height: 40%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
+                        <!-- Columna Derecha (Descripción + Fotos) -->
+                        <div class="edit-form-right">
+                            <!-- Descripción Física -->
+                            <div class="edit-form-group full-width">
+                                <label for="edit-description">Descripción Física</label>
+                                <textarea id="edit-description" name="physicDescription" rows="4"></textarea>
+                            </div>
 
-    .modal-content {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-    }
+                            <!-- Fotos -->
+                            <div class="edit-form-group full-width">
+                                <label>Fotografías</label>
+                                <div class="edit-photo-upload">
+                                    <input type="file" id="edit-photo-input" name="photos" accept="image/*" multiple>
+                                    <div id="edit-photo-preview" class="edit-photo-grid">
+                                        <!-- Fotos existentes y nuevas se mostrarán aquí -->
+                                    </div>
+                                    <span class="edit-error" id="edit-photo-error"></span>
+                                </div>
+                            </div>
+                        </div>
 
-    .btn-danger {
-        background-color: red;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        margin: 10px;
-        cursor: pointer;
-        border-radius: 5px;
-    }
+                        <!-- Botones de acción -->
+                        <div class="edit-form-actions">
+                            <button type="button" class="edit-btn-cancel" onclick="closeEditModal()">Cancelar</button>
+                            <button type="submit" class="edit-btn-save">Guardar Cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
 
-    .btn-secondary {
-        background-color: grey;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        margin: 10px;
-        cursor: pointer;
-        border-radius: 5px;
-    }
-</style>
+    <!-- SMS de confir-->
+     <div id="messageModal" class = "smsConfir"></div>
 
 
     <script src="../../js/config.js"></script>
     <script src="../../js/sections/registrar-buscados.js"></script>
 </body>
 </html>
- 

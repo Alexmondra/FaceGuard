@@ -10,47 +10,58 @@ body, html {
     box-sizing: inherit;
 }
 
-/* Container */
-.buscados-container {
-    width: 90%;
-    max-width: 1200px;
-    margin: 20px auto;
-}
-
-h2 {
-    text-align: center;
-    font-size: 2rem;
-    color: #333;
-}
 
 /* Toolbar */
 .buscados-toolbar {
     display: flex;
     justify-content: space-between;
-    margin: 20px 0;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #ddd; /* Línea divisoria */
 }
 
-.buscados-toolbar input {
-    width: 70%;
-    padding: 10px;
+/* Contenedor del input de búsqueda */
+.search-container {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+#searchInput {
+    width: 100%;
+    padding: 8px 12px;
     border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 1rem;
+    border-radius: 5px;
+    font-size: 14px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#searchInput:focus {
+    border-color: #007bff; 
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+    outline: none;
+}
+
+/* Contenedor del botón de agregar */
+
+.add-person-container {
+    margin-left: 10px;
 }
 
 .btn-primary {
-    padding: 10px 20px;
     background-color: #007bff;
-    color: #fff;
+    color: white;
+    padding: 8px 16px;
     border: none;
-    border-radius: 4px;
-    font-size: 1rem;
+    border-radius: 5px;
+    font-size: 14px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-primary:hover {
-    background-color: #0056b3;
+    background-color: #0056b3; 
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 /* Table */
@@ -123,8 +134,8 @@ h2 {
 .form-container {
     display: flex;
     gap: 20px;
-    height: 450px; /* Altura fija para que se igualen */
-    border: 1px solid #ccc; /* Para que se note todo el contenedor */
+    height: 450px;
+    border: 1px solid #ccc;
     border-radius: 8px;
     overflow: hidden;
 }
@@ -135,11 +146,10 @@ h2 {
     overflow-y: auto;
     position: relative;
 }
-/* Divisor vertical entre las dos columnas */
+
 .form-section:first-child {
     border-right: 2px solid #007bff;
 }
-
 
 .form-title {
     font-size: 1.2rem;
@@ -171,6 +181,7 @@ select {
 textarea {
     resize: vertical;
 }
+
 
 .field-error {
     color: #ff0000;
@@ -214,52 +225,100 @@ textarea {
 }
 
 /* Photo Upload */
+
 .photo-upload {
-    height: 100%; /* Ocupa todo el alto de la sección */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
     border: 3px dashed #007bff;
     border-radius: 8px;
     padding: 20px;
     text-align: center;
-    cursor: pointer;
     color: #007bff;
     font-weight: bold;
     font-size: 1.2rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    transition: background-color 0.3s ease;
-    position: relative; /* Importante para el input invisible */
+    position: relative;
+    justify-content: flex-start;
 }
 
-.photo-upload:hover {
-    background-color: rgba(0, 123, 255, 0.1);
-    border-color: #0056b3;
-    color: #0056b3;
-}
-
-/* Input file completamente invisible */
 .photo-upload input[type="file"] {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    cursor: pointer;
-}
-
-/* Texto dentro del área de arrastrar */
-.photo-upload span {
-    pointer-events: none; /* Permite que los clics lleguen al input invisible */
+    display: none;
 }
 
 .photo-preview-container {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 10px;
 }
+
+.photo-item {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    transition: all 0.2s ease;
+
+}
+
+.photo-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 5px;
+    border: 2px solid #007bff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.photo-item .delete-btn {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+    background: #c4494b;
+    color: white;
+    font-size: 14px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.add-more {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80px;
+    height: 80px;
+    border: 2px dashed #007bff;
+    border-radius: 5px;
+    color: #007bff;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.photo-upload.dragging {
+    background-color: rgba(0, 123, 255, 0.2);
+    border-color: #0056b3;
+    color: #0056b3;
+}
+
+
+/* estilso para las img al eliminar mas suave*/
+
+.photo-item.removing {
+  transform: scale(0);
+  opacity: 0;
+}
+.delete-btn:hover {
+  background: rgba(255, 0, 0, 0.7);
+  transform: scale(1.1);
+}
+
+
+
 
 /* Image Gallery */
 .image-gallery {
@@ -267,7 +326,7 @@ textarea {
     flex-wrap: wrap;
     gap: 10px;
     justify-content: center;
-} 
+}
 
 .image-gallery img {
     max-width: 100px;
@@ -276,9 +335,319 @@ textarea {
     border: 1px solid #ccc;
 }
 
+/* Modal de imágenes */
+.image-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+}
+
+.image-modal-content {
+    background: white;
+    margin: auto;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    max-width: 90%;
+    max-height: 90%;
+    overflow: auto;
+    text-align: center;
+}
+
+.gallery-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+
+.gallery-image {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.gallery-image:hover {
+    transform: scale(1.1);
+}
+
+.close-image-modal {
+    margin-top: 10px;
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+/* Modal de confirmación */
+.delete-confirm-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.delete-confirm-content {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.btn-danger {
+    background-color: red;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    margin: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.btn-secondary {
+    background-color: grey;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    margin: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .buscados-toolbar input {
         width: 60%;
     }
+    
+    .form-container {
+        flex-direction: column;
+        height: auto;
+    }
+    
+    .form-section:first-child {
+        border-right: none;
+        border-bottom: 2px solid #007bff;
+    }
+}
+
+/* Clases utilitarias */
+.hidden {
+    display: none;
+}
+
+.back-button {
+    margin-bottom: 20px;
+}
+/* sms de confirmacion de alguna acion*/
+.smsConfir {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #4caf50;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    z-index: 1000;
+    font-weight: bold;
+}
+
+/* loading de carga de imagnes */
+
+.spinner {
+    display: inline-block;
+    width: 50px;
+    height: 50px;
+    position: relative;
+}
+
+.spinner::before,
+.spinner::after {
+    content: '';
+    box-sizing: border-box;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 4px solid transparent;
+    animation: spinner 1.2s linear infinite;
+}
+
+.spinner::before {
+    border-top-color: #3498db; /* Color principal */
+    z-index: 1;
+}
+
+.spinner::after {
+    border-top-color: #8ecae6; /* Color más claro */
+    border-bottom-color: #219ebc; /* Color secundario */
+    animation-delay: -0.6s; /* Diferencia en el tiempo */
+}
+
+@keyframes spinner {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+
+
+/* para editar persona*/
+
+/* Estructura del Modal de Edición */
+.modal-edit {
+    display: none; /* Asegurar que empiece oculto */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    overflow-y: auto; /* Permitir scroll si el contenido es muy largo */
+}
+
+.modal-edit.hidden {
+    display: none;
+}
+
+.modal-edit-overlay {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100%;
+    padding: 20px;
+}
+
+.modal-edit-content {
+    background: #fff;
+    width: 90%;
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    position: relative;
+}
+
+.modal-edit-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none; 
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+/* Layout del formulario */
+.edit-form-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+
+.edit-form-left, .edit-form-right {
+    flex: 1;
+    min-width: 300px; 
+}
+
+.full-width {
+    width: 100%;
+}
+
+/* Estilos para los inputs y selects */
+.edit-form-group {
+    margin-bottom: 1rem;
+}
+
+.edit-form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.edit-form-group input,
+.edit-form-group select,
+.edit-form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Preview de Fotos */
+.edit-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.edit-photo-grid img {
+    width: 100%;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+/* Estilos para las imágenes */
+.edit-photo-item {
+    position: relative;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.edit-photo-item img {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+}
+
+.edit-photo-delete {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: red;
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.marked-for-delete {
+    opacity: 0.5;
+    border-color: red;
+}
+
+.new-photo {
+    border-color: #4CAF50;
 }

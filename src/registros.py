@@ -1,16 +1,14 @@
 from flask import Flask, Blueprint, jsonify, request, send_from_directory, current_app
-from conexiondb import conectar_db, faiss_index, indice_persona_id
+from conexiondb import conectar_db, agregar_embedding_faiss,eliminar_embeddings_faiss
 from utils import generar_embedding, detect_principal_face
 from data import aplicar_aumentaciones
 import os
 from PIL import Image
 from hashlib import sha256
 import pickle
-import numpy as np
-import faiss
+import numpy as np 
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from multiprocessing import Pool, cpu_count
-import math
 from io import BytesIO
 from functools import partial
 from werkzeug.utils import secure_filename
@@ -18,7 +16,7 @@ import threading
 import queue
 import time
 from concurrent.futures import ThreadPoolExecutor
-import hashlib
+
 
 # Crear un Blueprint
 rutas_personas = Blueprint('rutas_personas', __name__)
@@ -29,6 +27,10 @@ MAX_WORKERS = 2  # Ajustar según los núcleos del CPU
 processing_queue = queue.Queue()
 executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
+# --------------------------
+# Funciones de apoyo
+# --------------------------
+
 def obtener_datos_persona(persona_id):
     conexion = conectar_db()
     cursor = conexion.cursor(dictionary=True)
@@ -38,29 +40,10 @@ def obtener_datos_persona(persona_id):
     print(f"Datos recuperados para ID {persona_id}: {datos}") 
     return datos
 
-def worker():
-    """Worker que procesa imágenes de la cola indefinidamente"""
-    while True:
-        try:
-            task_data = processing_queue.get()
-            if task_data is None:  # Señal para terminar
-                break
-            procesar_imagen_async(*task_data)
-        except Exception as e:
-            print(f"Error en worker: {e}")
-        finally:
-            processing_queue.task_done()
-
-# Iniciar workers
-for _ in range(MAX_WORKERS):
-    threading.Thread(target=worker, daemon=True).start()
-
 def crear_carpeta_persona(dni):
-    # Usamos IMAGES_DIR definido a nivel del blueprint
     carpeta = os.path.join(IMAGES_DIR, secure_filename(dni))
     os.makedirs(carpeta, exist_ok=True)
     return carpeta
-
 
 def guardar_embedding_db(persona_id, embedding, tipo, descripcion, ruta_imagen):
     conexion = conectar_db()
@@ -72,8 +55,15 @@ def guardar_embedding_db(persona_id, embedding, tipo, descripcion, ruta_imagen):
                 VALUES (%s, %s, %s, %s, %s)
             """, (persona_id, pickle.dumps(embedding), tipo, descripcion, ruta_imagen))
         conexion.commit()
+        agregar_embedding_faiss(persona_id, embedding)
+
     finally:
-        conexion.close()
+        conexion.close() 
+
+
+# --------------------------
+# Funciones para el worker
+# --------------------------
 
 def procesar_imagen_async(img_bytes, persona_id, carpeta_dni, contador_imagenes):
     try:
@@ -98,13 +88,115 @@ def procesar_imagen_async(img_bytes, persona_id, carpeta_dni, contador_imagenes)
                         f"{persona_id}-{contador_imagenes}", 
                         ruta_imagen
                     )
+        
+        # Reconstruir índices después de procesar
+        
     except Exception as e:
         print(f"Error procesando imagen: {e}")
+
+def eliminar_imagenes_async(persona_id, hashes_a_eliminar):
+    try:
+        conexion = conectar_db()
+        cursor = conexion.cursor(dictionary=True)
+        
+        # Obtener el DNI de la persona para construir la ruta base
+        cursor.execute("SELECT dni FROM personas WHERE id = %s", (persona_id,))
+        persona = cursor.fetchone()
+        if not persona:
+            print(f"No se encontró persona con ID {persona_id}")
+            return
+            
+        dni = persona['dni']
+        base_dir = os.path.join(IMAGES_DIR, dni)
+        
+        for img_hash in hashes_a_eliminar:
+            # 1. Buscar la ruta completa usando el hash
+            cursor.execute("""
+                SELECT imagen_ruta, descripcion 
+                FROM embeddings_personas 
+                WHERE persona_id = %s AND imagen_ruta LIKE %s
+                LIMIT 1
+            """, (persona_id, f"%{img_hash}%"))
+            
+            registro = cursor.fetchone()
+            
+            if not registro:
+                print(f"No se encontró imagen con hash {img_hash} para persona {persona_id}")
+                continue
+                
+            ruta_imagen = registro['imagen_ruta']
+            descripcion = registro['descripcion']
+            
+            # Extraer la parte común de la descripción (ej: "17-1" de "17-1-cara")
+            identificador = '-'.join(descripcion.split('-')[:2])
+            
+            # 2. Eliminar todos los registros con la misma descripción base
+            cursor.execute("""
+                DELETE FROM embeddings_personas 
+                WHERE persona_id = %s AND descripcion LIKE %s
+            """, (persona_id, f"{identificador}%"))
+            
+            print(f"Eliminados registros para descripción: {identificador}")
+            
+            # 3. Eliminar archivo físico
+            if ruta_imagen:
+                # Construir ruta completa
+                nombre_archivo = os.path.basename(ruta_imagen)
+                ruta_completa = os.path.join(base_dir, nombre_archivo)
+                
+                if os.path.exists(ruta_completa):
+                    try:
+                        os.remove(ruta_completa)
+                        print(f"Archivo eliminado: {ruta_completa}")
+                    except Exception as e:
+                        print(f"Error eliminando archivo {ruta_completa}: {e}")
+                else:
+                    print(f"Archivo no encontrado: {ruta_completa}")
+        
+        conexion.commit()
+        print(f"Proceso completado para persona {persona_id}")
+        
+    except Exception as e:
+        print(f"Error en eliminar_imagenes_async: {str(e)}")
+        if conexion:
+            conexion.rollback()
+    finally:
+        if conexion:
+            conexion.close()
+
+def worker():
+    """Worker que procesa diferentes tipos de tareas"""
+    while True:
+        try:
+            task_type, *task_data = processing_queue.get()
+            if task_type is None:  # Señal para terminar
+                break
+                
+            if task_type == 'procesar_imagen':
+                img_bytes, persona_id, carpeta_dni, contador_imagenes = task_data
+                procesar_imagen_async(img_bytes, persona_id, carpeta_dni, contador_imagenes)
+                
+            elif task_type == 'eliminar_imagenes':
+                eliminar_embeddings_faiss(persona_id)
+                persona_id, rutas_a_eliminar = task_data
+                eliminar_imagenes_async(persona_id, rutas_a_eliminar)
+                
+        except Exception as e:
+            print(f"Error en worker: {e}")
+        finally:
+            processing_queue.task_done()
+
+# Iniciar workers
+for _ in range(MAX_WORKERS):
+    threading.Thread(target=worker, daemon=True).start()
+
+# --------------------------
+# Rutas del Blueprint
+# --------------------------
 
 @rutas_personas.route("/agregar_persona", methods=["POST"])
 @jwt_required()
 def agregar_persona_async():
-    """Endpoint para registro de personas con procesamiento asíncrono de imágenes"""
     try:
         dni = request.form.get("idNumber", "").strip()
         nombres = request.form.get("fullName", "").strip()
@@ -112,8 +204,6 @@ def agregar_persona_async():
         sexo = request.form.get("idSexo", "").strip()
         fecha_nac = request.form.get("idFecha", "").strip()
         descripcion = request.form.get("physicDescription", "").strip()
-        
-        
         
         if not dni or not nombres:
             return jsonify({"error": "DNI y nombres son obligatorios"}), 400
@@ -137,7 +227,7 @@ def agregar_persona_async():
         imagenes = request.files.getlist("photos")
         for i, img in enumerate(imagenes, 1):
             img_bytes = img.read()
-            processing_queue.put((img_bytes, persona_id, carpeta_dni, i))
+            processing_queue.put(('procesar_imagen', img_bytes, persona_id, carpeta_dni, i))
 
         return jsonify({
             "status": "success",
@@ -153,7 +243,104 @@ def agregar_persona_async():
             "message": str(e)
         }), 500
 
+@rutas_personas.route('/editar_persona/<int:persona_id>', methods=['PUT'])
+@jwt_required()
+def editar_persona(persona_id):
+    conexion = None
+    try:
+        # Obtener datos del formulario
+        dni = request.form.get("idNumber", "").strip()
+        nombres = request.form.get("fullName", "").strip()
+        apellidos = request.form.get("lastName", "").strip()
+        sexo = request.form.get("idSexo", "").strip()
+        fecha_nac = request.form.get("idFecha", "").strip()
+        descripcion = request.form.get("physicDescription", "").strip()
+        imagenes_eliminar = request.form.getlist('imagenes_eliminar[]')
+        nuevas_imagenes = request.files.getlist("photos")
 
+        # Validación básica
+        if not dni or not nombres:
+            return jsonify({"error": "DNI y nombres son obligatorios"}), 400
+
+        # 1. Actualizar datos básicos
+        conexion = conectar_db()
+        with conexion.cursor() as cursor:
+            # Verificar persona y obtener DNI actual
+            cursor.execute("SELECT dni FROM personas WHERE id = %s", (persona_id,))
+            persona_data = cursor.fetchone()
+            if not persona_data:
+                return jsonify({"error": "Persona no encontrada"}), 404
+            
+            dni_actual = persona_data[0]
+            cambio_dni = dni != dni_actual
+
+            # Actualizar datos (sin RETURNING)
+            cursor.execute("""
+                UPDATE personas 
+                SET dni = %s, nombres = %s, apellidos = %s, 
+                    genero = %s, fecha_nacimiento = %s, descripcion = %s
+                WHERE id = %s
+            """, (dni, nombres, apellidos, sexo, fecha_nac, descripcion, persona_id))
+
+            # Si cambió el DNI, manejar el cambio
+            if cambio_dni:
+                # Renombrar carpeta
+                carpeta_vieja = os.path.join(IMAGES_DIR, secure_filename(dni_actual))
+                carpeta_nueva = os.path.join(IMAGES_DIR, secure_filename(dni))
+                
+                if os.path.exists(carpeta_vieja):
+                    os.rename(carpeta_vieja, carpeta_nueva)
+                
+                # Actualizar rutas en la base de datos
+                cursor.execute("""
+                    UPDATE embeddings_personas 
+                    SET imagen_ruta = REPLACE(imagen_ruta, %s, %s)
+                    WHERE persona_id = %s AND imagen_ruta LIKE %s
+                """, (f"/{dni_actual}/", f"/{dni}/", persona_id, f"%/{dni_actual}/%"))
+
+        conexion.commit()
+
+        # 2. Procesar imágenes en segundo plano
+        if imagenes_eliminar:
+            processing_queue.put(('eliminar_imagenes', persona_id, imagenes_eliminar))
+
+        if nuevas_imagenes:
+            carpeta_dni = crear_carpeta_persona(dni)
+            
+            # Obtener último número de imagen usado
+            with conexion.cursor() as cursor:
+                cursor.execute("""
+                    SELECT MAX(CAST(SUBSTRING_INDEX(descripcion, '-', -1) AS UNSIGNED)) as max_num
+                    FROM embeddings_personas 
+                    WHERE persona_id = %s
+                """, (persona_id,))
+                resultado = cursor.fetchone()
+                contador_imagenes = (resultado[0] or 0) + 1
+
+                for img in nuevas_imagenes:
+                    img_bytes = img.read()
+                    processing_queue.put(('procesar_imagen', img_bytes, persona_id, carpeta_dni, contador_imagenes))
+                    contador_imagenes += 1
+
+        return jsonify({
+            "status": "success",
+            "message": "Edición iniciada. Las imágenes se están procesando en segundo plano",
+            "persona_id": persona_id,
+            "imagenes_a_eliminar": len(imagenes_eliminar),
+            "nuevas_imagenes": len(nuevas_imagenes),
+            "cambio_dni": cambio_dni
+        }), 202
+
+    except Exception as e:
+        if conexion:
+            conexion.rollback()
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    finally:
+        if conexion:
+            conexion.close()
 
 
 
@@ -276,7 +463,6 @@ def eliminar_persona(id):
     try:
         conexion = conectar_db()
         with conexion.cursor() as cursor:
-            # Buscar datos clave y dni
             cursor.execute("SELECT dni FROM personas WHERE id = %s", (id,))
             result = cursor.fetchone()
             if not result:
@@ -300,7 +486,7 @@ def eliminar_persona(id):
 
             # Borrar registros en embeddings_personas (ya borraste las imágenes físicas)
             cursor.execute("DELETE FROM embeddings_personas WHERE persona_id = %s", (id,))
-
+            eliminar_embeddings_faiss(id)
             # Borrar persona
             cursor.execute("DELETE FROM personas WHERE id = %s", (id,))
 
@@ -315,6 +501,7 @@ def eliminar_persona(id):
 
             conexion.commit()
         conexion.close()
+
         return jsonify({"success": True, "mensaje": "Persona eliminada exitosamente"}), 200
 
     except Exception as e:

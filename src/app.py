@@ -7,7 +7,7 @@ import pytz
 from datetime import datetime
 import threading
 import webbrowser
-from conexiondb import conectar_db,crear_tablas_si_no_existen, cargar_embeddings_faiss,poner_camaras_inactivas
+from conexiondb import conectar_db,crear_tablas_si_no_existen, cargar_todos_embeddings_faiss ,poner_camaras_inactivas
 from registros import rutas_personas
 from utils import socketio, jwt
 from camaras import rutas_camaras
@@ -89,7 +89,7 @@ def serve_css(filename):
     return send_from_directory(os.path.join(BASE_DIR, 'css'), filename)
 
 # Inicializar FAISS cargando embeddings desde la base de datos
-cargar_embeddings_faiss()
+cargar_todos_embeddings_faiss()
 
 
 # Registrar el Blueprint de rutas_camaras - rutas_personas

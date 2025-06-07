@@ -3,6 +3,7 @@ import faiss
 import numpy as np
 import pickle
 import os
+import threading
 
 def crear_tablas_si_no_existen(conexion):
     try:
@@ -58,23 +59,54 @@ def conectar_db():
 
 
 d = 512
-faiss_index = faiss.IndexFlatL2(d)
-indice_persona_id = {}
+faiss_index = faiss.IndexIDMap2(faiss.IndexFlatL2(d)) 
+faiss_lock = threading.Lock()  
 
-def cargar_embeddings_faiss():
+def cargar_todos_embeddings_faiss():
     conexion = conectar_db()
     if not conexion:
-        print("No se pudo establecer conexión con la base de datos. No se cargaron los embeddings.")
+        print("Error de conexión a la base de datos")
         return
-
     try:
         cursor = conexion.cursor()
         cursor.execute("SELECT persona_id, embedding FROM embeddings_personas")
-        for persona_id, embedding in cursor.fetchall():
-            faiss_index.add(np.array(pickle.loads(embedding), dtype=np.float32).reshape(1, -1))
-            indice_persona_id[faiss_index.ntotal - 1] = persona_id
-        print("Embeddings cargados en FAISS exitosamente")
+        
+        ids = []
+        embeddings = []
+        
+        for persona_id, embedding in cursor:
+            emb = np.array(pickle.loads(embedding), dtype=np.float32)
+            ids.append(persona_id)
+            embeddings.append(emb)
+        
+        with faiss_lock:
+            faiss_index.reset()
+            
+            if embeddings:
+                faiss_index.add_with_ids(np.vstack(embeddings), np.array(ids))
+        
     except Exception as e:
         print(f"Error al cargar embeddings en FAISS: {e}")
+        raise
     finally:
         conexion.close()
+
+def agregar_embedding_faiss(persona_id, embedding):
+    emb = np.array(embedding, dtype=np.float32) 
+    with faiss_lock:
+        faiss_index.add_with_ids(emb.reshape(1, -1), np.array([persona_id]))
+        
+
+
+def eliminar_embeddings_faiss(persona_id):
+    with faiss_lock:
+        try:
+            id_array = np.array([persona_id], dtype=np.int64)
+            
+            if faiss_index.id_map:
+                faiss_index.remove_ids(id_array)
+            else:
+                print(f"No se encontraron embeddings para persona_id {persona_id}")
+        except Exception as e:
+            print(f"Error al eliminar embeddings de FAISS: {e}")
+            raise

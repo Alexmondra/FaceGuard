@@ -4,7 +4,7 @@ import numpy as np
 import base64
 import torch
 from PIL import Image
-from conexiondb import conectar_db, indice_persona_id, faiss_index
+from conexiondb import conectar_db
 from facenet_pytorch import MTCNN
 from utils import mtcnn, facenet, transform_facenet, socketio
 from flask_socketio import join_room, leave_room
