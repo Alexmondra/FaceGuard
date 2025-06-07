@@ -101,7 +101,61 @@
     </div>
 </div>
 
+<div id="imageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 1000;">
+    <div id="modalContent" style="background: white; margin: auto; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); max-width: 90%; max-height: 90%; overflow: auto;">
+        <div id="imageGallery" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;"></div>
+        <button id="closeImageModal" style="margin-top: 10px; background: red; color: white; border: none; border-radius: 5px; padding: 10px 20px; cursor: pointer;">Cerrar</button>
+    </div>
+</div>
+
 <style>
+
+    #imageModal {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    #modalContent {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        max-width: 90%;
+        max-height: 90%;
+        overflow: auto;
+        text-align: center;
+    }
+    
+    .gallery-image {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+    
+    .gallery-image:hover {
+        transform: scale(1.1);
+    }
+    
+    #closeImageModal {
+        background: red;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        margin-top: 10px;
+        margin-bottom: -20px;
+    }
+
+
+
+
+
+
     .modal {
         position: fixed;
         top: 0;

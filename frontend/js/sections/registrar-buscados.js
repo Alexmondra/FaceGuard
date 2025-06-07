@@ -14,7 +14,7 @@ const addPersonBtn = document.getElementById("addPersonBtn");
 const backToListBtn = document.getElementById("backToListBtn");
 const personForm = document.getElementById("personForm");
 
-let currentView = "list";
+let currentView = "list"; 
 
 // Función para cambiar vista entre lista y formulario
 function switchView(view) {
@@ -228,26 +228,39 @@ async function submitPersonForm(event) {
 
 
 // Modal de imágenes (si tienes, sino borra estas funciones)
-function openImageModal(imagenes) {
-    if (!imageGallery || !imageModal) return; // seguridad
-    imageGallery.innerHTML = "";
-    imagenes.forEach(imagen => {
+
+function openImageModal(imagenes, nombrePersona) {
+    if (!imageGallery || !imageModal) return; // Seguridad
+    imageGallery.innerHTML = ""; // Limpiar galería anterior
+    imagenes.forEach((imagen) => {
         const imgElement = document.createElement("img");
         imgElement.src = imagen;
-        imgElement.alt = "Imagen de persona";
+        imgElement.alt = `Imagen de ${nombrePersona}`;
         imgElement.classList.add("gallery-image");
         imageGallery.appendChild(imgElement);
     });
-    imageModal.style.display = "block";
+
+    imageModal.style.display = "flex"; // Mostrar modal como flex
+    window.addEventListener("click", handleOutsideClick); // Añadir evento para clics fuera
 }
 
 function setupImageModalClose() {
     if (closeImageModal) {
-        closeImageModal.addEventListener("click", () => {
-            imageModal.style.display = "none";
-        });
+        closeImageModal.addEventListener("click", closeImageModalHandler);
     }
 }
+
+function closeImageModalHandler() {
+    imageModal.style.display = "none";
+    window.removeEventListener("click", handleOutsideClick); // Remover listener al cerrar
+}
+
+function handleOutsideClick(event) {
+    if (event.target === imageModal) {
+        closeImageModalHandler();
+    }
+}
+
 
 // Inicialización
 function init() {
