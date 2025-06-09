@@ -98,8 +98,12 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
     """Thread persistente que maneja conexión y reconexión automática de la cámara"""
     logger.info(f"[THREAD-START] Iniciando hilo persistente para cámara {nombre} (ID: {camara_id})")
     
-    while not stop_event.is_set():  # Bucle principal persistente
-        # Inicialización del estado
+    # Configuración de procesamiento
+    skip_frames = 10  # Procesar 1 de cada 3 frames para reducir carga
+    frame_counter = 0
+    
+    while not stop_event.is_set():
+        # Conexión inicial (código existente)
         with hilos_lock:
             hilos_camaras[camara_id].update({
                 'connecting': True,
@@ -110,14 +114,8 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
             })
         
         cap = None
-        frames_perdidos = 0
-        max_frames_perdidos = 10
-        frame_skip = 10
-        frame_count = 0
-        
         try:
-            # Configuración de conexión
-            logger.info(f"[CONEXIÓN] Intentando conectar a {nombre}...")
+            # Configuración de conexión (código existente)
             if tipo_camara == 'USB':
                 cap = cv2.VideoCapture(int(fuente), cv2.CAP_V4L2)
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -127,7 +125,7 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
                 cap = cv2.VideoCapture(fuente)
                 cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
             
-            # Espera activa para conexión (3 segundos máximo)
+            # Espera activa para conexión
             inicio = time.time()
             while not cap.isOpened() and (time.time() - inicio) < 3 and not stop_event.is_set():
                 time.sleep(0.1)
@@ -146,65 +144,58 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
                 })
             actualizar_estado_camara(camara_id, 'Activo')
             
-            # Bucle principal de captura
+            # Bucle principal de captura - MODIFICADO
             while not stop_event.is_set():
                 ret, frame = cap.read()
                 
                 if not ret:
-                    frames_perdidos += 1
                     with hilos_lock:
                         hilos_camaras[camara_id]['errors'] += 1
-                    
-                    if frames_perdidos >= max_frames_perdidos:
-                        logger.error(f"[DESCONEXIÓN] Demasiados frames perdidos en {nombre}")
-                        break
-                    
                     time.sleep(0.1)
                     continue
                 
-                # Frame válido recibido
-                frames_perdidos = 0
-                frame_count += 1
+                frame_counter += 1
+                frame_procesado = frame.copy()
                 
-                # Procesamiento del frame (código existente)
-                with hilos_lock:
-                    reconocimiento_activo = hilos_camaras[camara_id].get('reconocimiento_activo', False)
-                    enviar_frames = hilos_camaras[camara_id].get('enviar_frames', True)
+                # Procesamiento con reconocimiento siempre activo pero optimizado
+                if frame_counter % skip_frames == 0:
+                    try:
+                        frame_procesado, _ = procesar_frame(frame)
+                        with hilos_lock:
+                            hilos_camaras[camara_id]['last_processed_frame'] = frame_procesado
+                    except Exception as e:
+                        logger.error(f"Error en procesamiento: {str(e)}")
+                        frame_procesado = frame
                 
-                frame_procesado = frame
-                if reconocimiento_activo and frame_count % frame_skip == 0:
-                    frame_procesado, _ = procesar_frame(frame, reconocimiento_activo=True)
-                    with hilos_lock:
-                        hilos_camaras[camara_id]['last_processed_frame'] = frame_procesado
-                
+                # Envío del frame
                 try:
                     _, buffer = cv2.imencode('.jpg', frame_procesado, [cv2.IMWRITE_JPEG_QUALITY, 70])
                     frame_base64 = base64.b64encode(buffer.tobytes()).decode('utf-8')
                     
                     with hilos_lock:
-                        if camara_id in hilos_camaras and enviar_frames:
+                        if camara_id in hilos_camaras and hilos_camaras[camara_id].get('enviar_frames', True):
                             socketio.emit('video_frame', {
                                 'camera_id': camara_id,
-                                'frame': frame_base64,
-                                'reconocimiento_activo': reconocimiento_activo
+                                'frame': frame_base64
                             }, room=f'camara_{camara_id}', namespace='/')
                             hilos_camaras[camara_id].update({
                                 'last_frame': frame_base64,
                                 'last_activity': time.time()
                             })
                     
-                    time.sleep(0.03)  # Control de FPS (~30fps)
+                    # Control FPS más flexible
+                    time.sleep(0.03 if frame_counter % skip_frames == 0 else 0.01)
                 
                 except Exception as e:
-                    logger.error(f"[PROCESAMIENTO] Error procesando frame: {str(e)}")
-                    continue
-                
+                    logger.error(f"[PROCESAMIENTO] Error enviando frame: {str(e)}")
+                    time.sleep(0.1)
+        
         except Exception as e:
             logger.error(f"[ERROR] Error en cámara {nombre}: {str(e)}")
             actualizar_estado_camara(camara_id, 'Inactivo')
-            
+            time.sleep(1)  # Pequeña pausa antes de reintentar
+        
         finally:
-            # Limpieza segura
             if cap is not None:
                 try:
                     cap.release()
@@ -214,23 +205,18 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
             with hilos_lock:
                 hilos_camaras[camara_id].update({
                     'activo': False,
-                    'cap': None,
-                    'last_activity': time.time()
+                    'cap': None
                 })
             
-            # Espera para reconexión (excepto si nos pidieron detener)
             if not stop_event.is_set():
-                logger.info(f"[RECONEXIÓN] Esperando 60 segundos para reconectar {nombre}")
-                for _ in range(30):  # Espera en intervalos de 1 segundo para verificar stop_event
-                    if stop_event.is_set():
-                        break
-                    time.sleep(1)
+                logger.info(f"[RECONEXIÓN] Esperando 5 segundos para reconectar {nombre}")
+                time.sleep(5)
     
-    # Limpieza final al detener el hilo
+    # Limpieza final
     logger.info(f"[HILO-TERMINADO] Hilo persistente de {nombre} finalizado")
     with hilos_lock:
         if camara_id in hilos_camaras:
-            hilos_camaras[camara_id]['running'] = False       
+            hilos_camaras[camara_id]['running'] = False  
         
         
 
@@ -281,7 +267,7 @@ def actualizar_estado_camara(camara_id, estado):
     finally:
         conn.close()
         
-1
+
 # Handlers de Socket.IO
 @socketio.on('subscribe_camera')
 def handle_subscribe_camera(data):
@@ -291,9 +277,7 @@ def handle_subscribe_camera(data):
         with hilos_lock:
             if camara_id in hilos_camaras:
                 hilos_camaras[camara_id]['enviar_frames'] = True
-                hilos_camaras[camara_id]['reconocimiento_activo'] = True  # Forzar activación
-                logger.info(f"Reconocimiento ACTIVADO para cámara {camara_id}")  # Log de confirmación
-
+                logger.info(f"Cliente {request.sid} suscrito a cámara {camara_id}")
 
 @socketio.on('unsubscribe_camera')
 def handle_unsubscribe_camera(data):

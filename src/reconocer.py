@@ -75,59 +75,54 @@ def reconocer():
 
 
 
-def procesar_frame(frame, reconocimiento_activo=False):
-    print(f"Reconocimiento activo: {reconocimiento_activo}")  # Debug
+def procesar_frame(frame):
     last_boxes = []
     last_names = []
     last_colors = []
     last_asistencia_msgs = []
     umbral_actual = 70
     
-    if not reconocimiento_activo:
-        return frame, {}  # Retorno temprano si no hay reconocimient
-    if reconocimiento_activo:
-        print("Procesando frame para reconocimiento...")  # Debug
-        img_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        boxes, _ = mtcnn.detect(img_pil)
-        rostros = [img_pil.crop(list(map(int, box))) for box in boxes] if boxes is not None else []
-        
-        if boxes is not None:
-            for i, (box, rostro) in enumerate(zip(boxes, rostros)):
-                x1, y1, x2, y2 = map(int, box)
-                embedding = transform_facenet(rostro).unsqueeze(0)
-                with torch.no_grad():
-                    embedding = facenet(embedding).squeeze().numpy()
+    img_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    boxes, _ = mtcnn.detect(img_pil)
+    rostros = [img_pil.crop(list(map(int, box))) for box in boxes] if boxes is not None else []
+    
+    if boxes is not None:
+        for i, (box, rostro) in enumerate(zip(boxes, rostros)):
+            x1, y1, x2, y2 = map(int, box)
+            embedding = transform_facenet(rostro).unsqueeze(0)
+            with torch.no_grad():
+                embedding = facenet(embedding).squeeze().numpy()
 
-                color = (0, 0, 255)
-                nombre = "Desconocido"
-                asistencia_msg = ""
+            color = (0, 0, 255)
+            nombre = "Desconocido"
+            asistencia_msg = ""
 
-                if faiss_index is not None:
-                    distancias, indices = faiss_index.search(
-                        np.array(embedding, dtype=np.float32).reshape(1, -1), 1)
-                    if indices[0][0] != -1:
-                        distancia = distancias[0][0]
-                        confianza = round((1 - distancia) * 100, 2)
-                        if confianza >= umbral_actual:
-                            persona_id = int(indices[0][0])
-                            datos = obtener_datos_persona(persona_id)
-                            nombre = datos["nombres"]
-                            color = (0, 255, 0)
-                            
-                last_boxes.append((x1, y1, x2, y2))
-                last_names.append(nombre)
-                last_colors.append(color)
-                last_asistencia_msgs.append(asistencia_msg)
+            if faiss_index is not None:
+                distancias, indices = faiss_index.search(
+                    np.array(embedding, dtype=np.float32).reshape(1, -1), 1)
+                if indices[0][0] != -1:
+                    distancia = distancias[0][0]
+                    confianza = round((1 - distancia) * 100, 2)
+                    if confianza >= umbral_actual:
+                        persona_id = int(indices[0][0])
+                        datos = obtener_datos_persona(persona_id)
+                        nombre = datos["nombres"]
+                        color = (0, 255, 0)
+                        
+            last_boxes.append((x1, y1, x2, y2))
+            last_names.append(nombre)
+            last_colors.append(color)
+            last_asistencia_msgs.append(asistencia_msg)
 
-        # Dibujar resultados en el frame
-        for (x1, y1, x2, y2), nombre, color, msg in zip(last_boxes, last_names, last_colors, last_asistencia_msgs):
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            if msg:
-                cv2.putText(frame, nombre, (x1, y1 - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
-                azul_claro = (180, 220, 255)
-                cv2.putText(frame, msg, (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, azul_claro, 2, cv2.LINE_AA)
-            else:
-                cv2.putText(frame, nombre, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
+    # Dibujar resultados en el frame
+    for (x1, y1, x2, y2), nombre, color, msg in zip(last_boxes, last_names, last_colors, last_asistencia_msgs):
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        if msg:
+            cv2.putText(frame, nombre, (x1, y1 - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
+            azul_claro = (180, 220, 255)
+            cv2.putText(frame, msg, (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, azul_claro, 2, cv2.LINE_AA)
+        else:
+            cv2.putText(frame, nombre, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
     
     return frame, {
         'boxes': last_boxes,
