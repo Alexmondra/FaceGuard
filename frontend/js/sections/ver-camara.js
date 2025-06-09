@@ -72,24 +72,42 @@ const CameraSystem = (() => {
         },
 
         renderCameraCheckboxes(cameras) {
-            const renderCheckbox = (container, cam) => {
-                const label = document.createElement("label");
-                label.innerHTML = `
-                    <input type="checkbox" name="multiCamera" value="${cam.id}">
-                    ${cam.nombre}
-                `;
-                container.appendChild(label);
-                container.appendChild(document.createElement("br"));
-            };
-
-            selectors.modalCheckboxContainer.innerHTML = "";
-            selectors.externalCheckboxContainer.innerHTML = "";
-
+            const container = selectors.modalCheckboxContainer;
+            container.innerHTML = ""; // Limpiar contenedor principal
+        
             cameras.forEach(cam => {
-                renderCheckbox(selectors.modalCheckboxContainer, cam);
-                renderCheckbox(selectors.externalCheckboxContainer, cam);
+                const userContainer = document.createElement("div");
+                userContainer.className = "user-container"; // Clase para estilos personalizados
+        
+                // Título del usuario o "Sin usuario asociado"
+                const userTitle = document.createElement("h3");
+                userTitle.textContent = cam.usuarios && cam.usuarios.length > 0 
+                    ? `Usuario: ${cam.usuarios[0].usuario_nombre}` 
+                    : "Sin usuario asociado";
+                userContainer.appendChild(userTitle);
+        
+                // Crear lista de cámaras asociadas al usuario
+                const cameraList = document.createElement("div");
+                cameraList.className = "camera-list"; // Clase para estilos de cámaras
+        
+                cam.usuarios?.forEach(user => {
+                    const cameraContainer = document.createElement("div");
+                    cameraContainer.className = "camera-container";
+        
+                    const label = document.createElement("label");
+                    label.innerHTML = `
+                        <input type="checkbox" name="multiCamera" value="${cam.id}">
+                        ${cam.nombre}
+                    `;
+                    cameraContainer.appendChild(label);
+                    cameraList.appendChild(cameraContainer);
+                });
+        
+                userContainer.appendChild(cameraList);
+                container.appendChild(userContainer);
             });
         },
+        
 
         setupCheckboxSync() {
             const syncCheckboxes = (source, target) => {
@@ -189,7 +207,7 @@ const CameraSystem = (() => {
     const Comms = {
         async fetchCameras() {
             try {
-                const response = await fetch(`${config.apiUrl}/obtener`, {
+                const response = await fetch(`${config.apiUrl}/obtener_activas`, {
                     method: "GET",
                     headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
                 });

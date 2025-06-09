@@ -1,6 +1,5 @@
 import os
 from flask import Flask, send_from_directory , request, jsonify , abort , render_template
-import webbrowser 
 from flask_cors import CORS
 import logging
 import pytz
@@ -110,16 +109,17 @@ def verT():
 
 @app.route('/v')
 def v():
-    return multicamara.diagnostico_hilos()
+    return multicamara.obtener_camaras_activas()
+
 
 
 def ciclo_verificacion():
-    while True:
-        multicamara.verificar_y_lanzar_camaras()
-        socketio.sleep(30)  # Usa socketio.sleep
+    socketio.sleep(20)  # Espera inicial para que el servidor se estabilice
+    multicamara.verificar_y_lanzar_camaras()
 
 if __name__ == "__main__":
     try:
+        multicamara.verificar_y_lanzar_camaras()
         #thread_verificacion = threading.Thread(target=ciclo_verificacion, daemon=True)
         #thread_verificacion.start()
         #webbrowser.open_new("http://localhost:5000/")

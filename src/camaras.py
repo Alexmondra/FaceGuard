@@ -48,6 +48,70 @@ def obtener_camaras_por_rol(cursor, user_id, rol):
         """, (user_id,))
     return cursor.fetchall()
 
+
+
+#ruta de camaras por user
+def obtener_camaras_por_usuario(cursor, user_id, rol):
+    if rol == 'admin':
+        cursor.execute("""
+            SELECT c.id AS camara_id, c.nombre AS camara_nombre, c.estado AS camara_estado,
+                   u.id AS usuario_id, u.username AS usuario_nombre
+            FROM camaras c
+            LEFT JOIN usuario_camara uc ON c.id = uc.camara_id
+            LEFT JOIN usuarios u ON uc.usuario_id = u.id
+            WHERE c.estado = 'Activo'
+        """)
+        camaras = cursor.fetchall()
+
+        # Organizar las cámaras y los usuarios en un formato agrupado
+        resultado = {}
+        for camara in camaras:
+            camara_id = camara['camara_id']
+            if camara_id not in resultado:
+                resultado[camara_id] = {
+                    "id": camara_id,
+                    "nombre": camara['camara_nombre'],
+                    "estado": camara['camara_estado'],
+                    "usuarios": []
+                }
+            if camara['usuario_id']:
+                resultado[camara_id]["usuarios"].append({
+                    "usuario_id": camara['usuario_id'],
+                    "usuario_nombre": camara['usuario_nombre']
+                })
+        return list(resultado.values())
+    else:
+        cursor.execute("""
+            SELECT c.id AS camara_id, c.nombre AS camara_nombre, c.estado AS camara_estado
+            FROM camaras c
+            INNER JOIN usuario_camara uc ON c.id = uc.camara_id
+            WHERE uc.usuario_id = %s AND c.estado = 'Activo'
+        """, (user_id,))
+        return cursor.fetchall()
+
+
+
+@rutas_camaras.route('/obtener_activas', methods=['GET'])
+@jwt_required()
+def obtener_camaras_Activas():
+    try:
+        user_data = obtener_usuario_actual() 
+        conexion = conectar_db()
+        cursor = conexion.cursor(dictionary=True)
+
+        # Obtener cámaras según el rol
+        camaras = obtener_camaras_por_usuario(cursor, user_data['id'], user_data['rol'])
+        cursor.close()
+        conexion.close()
+
+        return jsonify(camaras), 200
+    except Exception as e:
+        logger.error(f"Error al obtener cámaras: {str(e)}")
+        return jsonify({'error': 'Ocurrió un error al obtener las cámaras. Intente nuevamente más tarde.'}), 500
+
+
+
+
 # Ruta para verificar cámaras
 @rutas_camaras.route('/obtener', methods=['GET'])
 @jwt_required()
@@ -65,6 +129,7 @@ def obtener_camaras():
     except Exception as e:
         logger.error(f"Error al obtener cámaras: {str(e)}")
         return jsonify({'error': 'Ocurrió un error al obtener las cámaras. Intente nuevamente más tarde.'}), 500
+
 
 
 @rutas_camaras.route('/registrar', methods=['POST'])

@@ -2,18 +2,13 @@ import threading
 import cv2
 import numpy as np
 import base64
-import torch
-from PIL import Image
 from conexiondb import conectar_db
-from facenet_pytorch import MTCNN
-from utils import mtcnn, facenet, transform_facenet, socketio
+from utils import socketio
 from flask_socketio import join_room, leave_room
 from flask import request
 import logging
 import time
-import fcntl 
-import os
-
+from reconocer import procesar_frame
 
 # Configure logging
 logging.basicConfig(
@@ -48,11 +43,14 @@ def listar_hilos_camaras():
     with hilos_lock:
         return [{
             'camara_id': cam_id,
-            'thread_id': data['thread'].ident,
-            'name': data['nombre'],
-            'alive': data['thread'].is_alive(),
-            'sending_frames': data['enviar_frames'],
-            'last_frame': data['last_frame'] is not None
+            'thread_id': data.get('thread', {}).ident if 'thread' in data else None,
+            'name': data.get('nombre', 'Desconocido'),
+            'alive': data.get('thread', {}).is_alive() if 'thread' in data else False,
+            'sending_frames': data.get('enviar_frames', False),
+            'last_frame': data.get('last_frame') is not None,
+            'activo': data.get('activo', False),
+            'running': data.get('running', False),
+            'last_activity': data.get('last_activity', 0)
         } for cam_id, data in hilos_camaras.items()]
 
 
@@ -97,165 +95,174 @@ def cerrarhiloCamara(camara_id):
 
 # Función que ejecuta el hilo para una cámara
 def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
-    """Thread que gestiona la conexión y captura de frames de la cámara"""
-    logger.info(f"[THREAD-START] Iniciando hilo para cámara {nombre} (ID: {camara_id})")
+    """Thread persistente que maneja conexión y reconexión automática de la cámara"""
+    logger.info(f"[THREAD-START] Iniciando hilo persistente para cámara {nombre} (ID: {camara_id})")
     
-    # Registrar el hilo con estado inicial
-    with hilos_lock:
-        hilos_camaras[camara_id] = {
-            'thread': threading.current_thread(),
-            'stop_event': stop_event,
-            'enviar_frames': True,
-            'last_frame': None,
-            'nombre': nombre,
-            'activo': True,
-            'running': True  # Nuevo flag para controlar estado real
-        }
-    
-    cap = None
-    tiempo_espera_conexion = 3  # Segundos para esperar conexión
-    
-    try:
-        # Intento de conexión único
-        logger.debug(f"[CONEXIÓN] Intentando conectar a {nombre}...")
-        
-        if tipo_camara == 'USB':
-            cap = cv2.VideoCapture(int(fuente), cv2.CAP_V4L2)
-            # Configuración óptima para USB
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            cap.set(cv2.CAP_PROP_FPS, 30)
-        else:
-            cap = cv2.VideoCapture(fuente)
-            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)  # 3 segundos timeout
-        
-        # Espera activa para conexión
-        inicio = time.time()
-        while not cap.isOpened() and (time.time() - inicio) < tiempo_espera_conexion:
-            time.sleep(0.1)
-        
-        if not cap.isOpened():
-            logger.error(f"[CONEXIÓN-FALLIDA] No se pudo conectar a {nombre}")
-            actualizar_estado_camara(camara_id, 'Inactivo')
-            return
-        
-        # Conexión exitosa
-        logger.info(f"[CONEXIÓN-EXITOSA] {nombre} conectada")
-        actualizar_estado_camara(camara_id, 'Activo')
-        
-        # Variables para control de frames perdidos
-        max_frames_perdidos = 10
-        frames_perdidos = 0
-        
-        # Bucle principal de captura
-        while not stop_event.is_set():
-            ret, frame = cap.read()
-            
-            if not ret:
-                frames_perdidos += 1
-                logger.warning(f"[FRAME-ERROR] Frame perdido #{frames_perdidos} en {nombre}")
-                
-                if frames_perdidos >= max_frames_perdidos:
-                    logger.error(f"[DESCONEXIÓN] Demasiados frames perdidos en {nombre}")
-                    actualizar_estado_camara(camara_id, 'Inactivo')
-                    break
-                
-                time.sleep(0.1)
-                continue
-            
-            # Resetear contador si frame es válido
-            frames_perdidos = 0
-            
-            # Procesamiento del frame
-            try:
-                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                frame_base64 = base64.b64encode(buffer.tobytes()).decode('utf-8')
-                
-                with hilos_lock:
-                    if camara_id in hilos_camaras and hilos_camaras[camara_id]['enviar_frames']:
-                        socketio.emit('video_frame', {
-                            'camera_id': camara_id,
-                            'frame': frame_base64
-                        }, room=f'camara_{camara_id}', namespace='/')
-                        hilos_camaras[camara_id]['last_frame'] = frame_base64
-                
-                time.sleep(0.03)  # Control de FPS (~30fps)
-            
-            except Exception as e:
-                logger.error(f"[PROCESAMIENTO] Error procesando frame en {nombre}: {str(e)}")
-                continue
-    
-    except Exception as e:
-        logger.error(f"[ERROR-HILO] Error en hilo {nombre}: {str(e)}")
-        actualizar_estado_camara(camara_id, 'Inactivo')
-    
-    finally:
-        logger.info(f"[FINALIZACIÓN] Limpiando recursos de {nombre}")
-        
-        # Cerrar conexión con la cámara
-        if cap is not None:
-            try:
-                cap.release()
-            except:
-                pass
-        
-        # Marcar como terminado pero no eliminar inmediatamente
+    while not stop_event.is_set():  # Bucle principal persistente
+        # Inicialización del estado
         with hilos_lock:
-            if camara_id in hilos_camaras:
-                hilos_camaras[camara_id]['running'] = False
-                hilos_camaras[camara_id]['activo'] = False
+            hilos_camaras[camara_id].update({
+                'connecting': True,
+                'running': True,
+                'activo': False,
+                'last_activity': time.time(),
+                'errors': 0
+            })
         
-        logger.info(f"[HILO-TERMINADO] Hilo de {nombre} finalizado")
+        cap = None
+        frames_perdidos = 0
+        max_frames_perdidos = 10
+        frame_skip = 10
+        frame_count = 0
+        
+        try:
+            # Configuración de conexión
+            logger.info(f"[CONEXIÓN] Intentando conectar a {nombre}...")
+            if tipo_camara == 'USB':
+                cap = cv2.VideoCapture(int(fuente), cv2.CAP_V4L2)
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap.set(cv2.CAP_PROP_FPS, 30)
+            else:
+                cap = cv2.VideoCapture(fuente)
+                cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
+            
+            # Espera activa para conexión (3 segundos máximo)
+            inicio = time.time()
+            while not cap.isOpened() and (time.time() - inicio) < 3 and not stop_event.is_set():
+                time.sleep(0.1)
+            
+            if not cap.isOpened() or stop_event.is_set():
+                raise ConnectionError(f"No se pudo conectar a {nombre}")
+            
+            # Conexión exitosa
+            logger.info(f"[CONEXIÓN-EXITOSA] {nombre} conectada")
+            with hilos_lock:
+                hilos_camaras[camara_id].update({
+                    'activo': True,
+                    'connecting': False,
+                    'cap': cap,
+                    'last_success': time.time()
+                })
+            actualizar_estado_camara(camara_id, 'Activo')
+            
+            # Bucle principal de captura
+            while not stop_event.is_set():
+                ret, frame = cap.read()
+                
+                if not ret:
+                    frames_perdidos += 1
+                    with hilos_lock:
+                        hilos_camaras[camara_id]['errors'] += 1
+                    
+                    if frames_perdidos >= max_frames_perdidos:
+                        logger.error(f"[DESCONEXIÓN] Demasiados frames perdidos en {nombre}")
+                        break
+                    
+                    time.sleep(0.1)
+                    continue
+                
+                # Frame válido recibido
+                frames_perdidos = 0
+                frame_count += 1
+                
+                # Procesamiento del frame (código existente)
+                with hilos_lock:
+                    reconocimiento_activo = hilos_camaras[camara_id].get('reconocimiento_activo', False)
+                    enviar_frames = hilos_camaras[camara_id].get('enviar_frames', True)
+                
+                frame_procesado = frame
+                if reconocimiento_activo and frame_count % frame_skip == 0:
+                    frame_procesado, _ = procesar_frame(frame, reconocimiento_activo=True)
+                    with hilos_lock:
+                        hilos_camaras[camara_id]['last_processed_frame'] = frame_procesado
+                
+                try:
+                    _, buffer = cv2.imencode('.jpg', frame_procesado, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    frame_base64 = base64.b64encode(buffer.tobytes()).decode('utf-8')
+                    
+                    with hilos_lock:
+                        if camara_id in hilos_camaras and enviar_frames:
+                            socketio.emit('video_frame', {
+                                'camera_id': camara_id,
+                                'frame': frame_base64,
+                                'reconocimiento_activo': reconocimiento_activo
+                            }, room=f'camara_{camara_id}', namespace='/')
+                            hilos_camaras[camara_id].update({
+                                'last_frame': frame_base64,
+                                'last_activity': time.time()
+                            })
+                    
+                    time.sleep(0.03)  # Control de FPS (~30fps)
+                
+                except Exception as e:
+                    logger.error(f"[PROCESAMIENTO] Error procesando frame: {str(e)}")
+                    continue
+                
+        except Exception as e:
+            logger.error(f"[ERROR] Error en cámara {nombre}: {str(e)}")
+            actualizar_estado_camara(camara_id, 'Inactivo')
+            
+        finally:
+            # Limpieza segura
+            if cap is not None:
+                try:
+                    cap.release()
+                except:
+                    pass
+            
+            with hilos_lock:
+                hilos_camaras[camara_id].update({
+                    'activo': False,
+                    'cap': None,
+                    'last_activity': time.time()
+                })
+            
+            # Espera para reconexión (excepto si nos pidieron detener)
+            if not stop_event.is_set():
+                logger.info(f"[RECONEXIÓN] Esperando 60 segundos para reconectar {nombre}")
+                for _ in range(30):  # Espera en intervalos de 1 segundo para verificar stop_event
+                    if stop_event.is_set():
+                        break
+                    time.sleep(1)
+    
+    # Limpieza final al detener el hilo
+    logger.info(f"[HILO-TERMINADO] Hilo persistente de {nombre} finalizado")
+    with hilos_lock:
+        if camara_id in hilos_camaras:
+            hilos_camaras[camara_id]['running'] = False       
+        
+        
 
 def verificar_y_lanzar_camaras():
-    """Verifica y gestiona el estado de los hilos de cámara"""
-    logger.info("[MONITOR] Verificando estado de cámaras")
-    
+    logger.info("[MONITOR] Verificando cámaras nuevas")
     conn = conectar_db()
     try:
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, nombre, tipo_camara, fuente FROM camaras WHERE estado = 'Inactivo'")
-        camaras = cursor.fetchall()
+        cursor.execute("SELECT id, nombre, tipo_camara, fuente FROM camaras")
         
         with hilos_lock:
-            # Primero limpiar hilos terminados
-            ahora = time.time()
-            for camara_id in list(hilos_camaras.keys()):
-                hilo_data = hilos_camaras[camara_id]
-                
-                # Eliminar solo si el hilo terminó y está marcado como no running
-                if not hilo_data['running'] and not hilo_data['thread'].is_alive():
-                    logger.info(f"[LIMPIAR-HILO] Eliminando hilo terminado para {hilo_data['nombre']}")
-                    del hilos_camaras[camara_id]
-            
-            # Luego crear nuevos hilos para cámaras inactivas
-            for camara in camaras:
-                camara_id = camara['id']
-                
-                if camara_id not in hilos_camaras or (
-                    not hilos_camaras[camara_id]['thread'].is_alive() and 
-                    not hilos_camaras[camara_id]['running']
-                ):
-                    logger.info(f"[CREAR-HILO] Iniciando hilo para {camara['nombre']}")
+            # Solo crear hilos para cámaras que no tienen uno
+            for camara in cursor.fetchall():
+                cam_id = camara['id']
+                if cam_id not in hilos_camaras:
+                    logger.info(f"[NUEVO-HILO] Creando hilo persistente para {camara['nombre']}")
                     stop_event = threading.Event()
-                    new_thread = threading.Thread(
+                    thread = threading.Thread(
                         target=hilo_camara,
-                        args=(camara_id, camara['nombre'], camara['tipo_camara'], camara['fuente'], stop_event),
+                        args=(cam_id, camara['nombre'], camara['tipo_camara'], camara['fuente'], stop_event),
                         daemon=True
                     )
                     
-                    hilos_camaras[camara_id] = {
-                        'thread': new_thread,
+                    hilos_camaras[cam_id] = {
+                        'thread': thread,
                         'stop_event': stop_event,
-                        'enviar_frames': True,
-                        'last_frame': None,
                         'nombre': camara['nombre'],
-                        'activo': False,
-                        'running': True
+                        'running': True,
+                        'activo': False
                     }
+                    thread.start()
                     
-                    new_thread.start()
-    
     except Exception as e:
         logger.error(f"[MONITOR-ERROR] Error: {str(e)}")
     finally:
@@ -274,56 +281,19 @@ def actualizar_estado_camara(camara_id, estado):
     finally:
         conn.close()
         
-
-def diagnostico_hilos():
-    """Función para diagnosticar problemas con los hilos"""
-    with hilos_lock:
-        # 1. Ver hilos registrados
-        registrados = list(hilos_camaras.keys())
-        
-        # 2. Ver hilos activos del sistema
-        activos = [t.name for t in threading.enumerate() if t.name.startswith('Camara_')]
-        
-        # 3. Encontrar discrepancias
-        problemas = []
-        for camara_id, data in hilos_camaras.items():
-            if not data['thread'].is_alive():
-                problemas.append(f"Cámara {camara_id} registrada pero hilo muerto")
-        
-        for thread_name in activos:
-            parts = thread_name.split('_')
-            if len(parts) >= 2 and parts[0] == 'Camara':
-                camara_id = parts[1]
-                if camara_id not in hilos_camaras:
-                    problemas.append(f"Hilo {thread_name} activo pero no registrado")
-    
-    return {
-        'registrados': registrados,
-        'activos': activos,
-        'problemas': problemas
-    }
-
-
-# Demonio para supervisar los hilos             
+1
 # Handlers de Socket.IO
 @socketio.on('subscribe_camera')
 def handle_subscribe_camera(data):
-    """Único handler para suscripción"""
     camara_id = data.get('camera_id')
     if camara_id:
         join_room(f'camara_{camara_id}')
         with hilos_lock:
             if camara_id in hilos_camaras:
                 hilos_camaras[camara_id]['enviar_frames'] = True
-        logger.info(f"Cliente {request.sid} suscrito a cámara {camara_id}")
+                hilos_camaras[camara_id]['reconocimiento_activo'] = True  # Forzar activación
+                logger.info(f"Reconocimiento ACTIVADO para cámara {camara_id}")  # Log de confirmación
 
-        # Enviar último frame si existe
-        with hilos_lock:
-            if camara_id in hilos_camaras and hilos_camaras[camara_id].get('last_frame'):
-                socketio.emit('video_frame', {
-                    'camera_id': camara_id,
-                    'frame': hilos_camaras[camara_id]['last_frame']
-                }, room=request.sid, namespace='/')
 
 @socketio.on('unsubscribe_camera')
 def handle_unsubscribe_camera(data):
