@@ -24,7 +24,6 @@ def guardarReconocido(frame, persona_id, camara_id):
         resultado = cursor.fetchone()
         
         if resultado[0] > 0:
-            print(f"Persona {persona_id} ya registrada en cámara {camara_id} en los últimos 5 minutos")
             conexion.close()
             return None
             

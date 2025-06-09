@@ -141,67 +141,126 @@ const CameraSystem = (() => {
     };
 
     // ==================== Módulo de Grid ====================
-    const CameraGrid = {
-        render(cameraIds) {
-            selectors.gridView.classList.add("active");
-            this.clear();
 
-            if (cameraIds.length === 0) {
-                Utils.toggleElement(selectors.gridPlaceholder, true);
-                Utils.toggleElement(selectors.singleView, true);
-                return;
-            }
+// ==================== Módulo de Grid ====================
+const CameraGrid = {
+    render(cameraIds) {
+        selectors.gridView.classList.add("active");
+        this.clear();
 
-            Utils.toggleElement(selectors.gridPlaceholder, false);
-            Utils.toggleElement(selectors.singleView, false);
+        if (cameraIds.length === 0) {
+            Utils.toggleElement(selectors.gridPlaceholder, true);
+            Utils.toggleElement(selectors.singleView, true);
+            return;
+        }
 
-            cameraIds.forEach(camId => this.addCamera(camId));
-        },
+        Utils.toggleElement(selectors.gridPlaceholder, false);
+        Utils.toggleElement(selectors.singleView, false);
 
-        clear() {
-            selectors.gridView.querySelectorAll(".grid-item").forEach(el => el.remove());
-        },
+        cameraIds.forEach(camId => this.addCamera(camId));
+    },
 
-        addCamera(camId) {
-            camId = Utils.normalizeCameraId(camId);
-            const cam = state.cameras.find(c => Utils.normalizeCameraId(c.id) === camId);
-            const nombre = cam ? cam.nombre : camId;
+    clear() {
+        selectors.gridView.querySelectorAll(".grid-item").forEach(el => el.remove());
+    },
 
-            const gridItem = document.createElement("div");
-            gridItem.className = "grid-item";
-            gridItem.style.flex = `1 1 calc(${100 / state.subscribedCameras.size}% - 10px)`;
-            gridItem.innerHTML = `
-                <div class="grid-camera">
+    addCamera(camId) {
+        camId = Utils.normalizeCameraId(camId);
+        const cam = state.cameras.find(c => Utils.normalizeCameraId(c.id) === camId);
+        const nombre = cam ? cam.nombre : camId;
+
+        const gridItem = document.createElement("div");
+        gridItem.className = "grid-item";
+        gridItem.style.flex = `1 1 calc(${100 / state.subscribedCameras.size}% - 10px)`;
+        gridItem.innerHTML = `
+            <div class="grid-camera">
+                <div class="camera-header">
                     <span class="camera-name">${nombre}</span>
-                    <img id="camFrame_${camId}" class="camera-feed" />
+                    <div class="camera-controls">
+                        <button class="settings-btn" data-cam-id="${camId}">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <div class="settings-menu" data-cam-id="${camId}">
+                            <div class="tracking-control">
+                                <label>Seguimiento:</label>
+                                <div class="radio-group">
+                                    <label>
+                                        <input type="radio" name="tracking_${camId}" value="off" checked>
+                                        Desactivado
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="tracking_${camId}" value="on">
+                                        Activado
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            `;
+                <img id="camFrame_${camId}" class="camera-feed" />
+            </div>
+        `;
 
-            selectors.gridView.appendChild(gridItem);
+        selectors.gridView.appendChild(gridItem);
 
-            if (!state.subscribedCameras.has(camId)) {
-                state.socket.emit("subscribe_camera", { camera_id: camId });
-                state.subscribedCameras.set(camId, {
-                    element: gridItem,
-                    active: true,
-                    lastFrame: null
-                });
-            }
-        },
+        // Configurar eventos
+        const settingsBtn = gridItem.querySelector(".settings-btn");
+        const settingsMenu = gridItem.querySelector(".settings-menu");
+        const radioButtons = gridItem.querySelectorAll('input[name^="tracking_"]');
 
-        updateCameraFrame(cameraId, frame) {
-            const normalizedId = Utils.normalizeCameraId(cameraId);
-            const cameraData = state.subscribedCameras.get(normalizedId);
-            
-            if (cameraData) {
-                const img = cameraData.element.querySelector(".camera-feed");
-                if (img) {
-                    img.src = `data:image/jpeg;base64,${frame}`;
-                    cameraData.lastFrame = frame;
+        settingsBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            // Cerrar otros menús abiertos
+            document.querySelectorAll('.settings-menu').forEach(menu => {
+                if (menu !== settingsMenu) menu.style.display = 'none';
+            });
+            settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
+        });
+
+        radioButtons.forEach(radio => {
+            radio.addEventListener("change", (e) => {
+                const camId = e.target.closest('.settings-menu').dataset.camId;
+                const trackingEnabled = e.target.value === 'on';
+                
+                if (trackingEnabled) {
+                    state.socket.emit("activar_seguimiento", { camera_id: camId });
+                } else {
+                    state.socket.emit("desactivar_seguimiento", { camera_id: camId });
                 }
+            });
+        });
+
+        // Cerrar menú al hacer clic fuera
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest('.settings-menu') && !e.target.closest('.settings-btn')) {
+                settingsMenu.style.display = 'none';
+            }
+        });
+
+        if (!state.subscribedCameras.has(camId)) {
+            state.socket.emit("subscribe_camera", { camera_id: camId });
+            state.subscribedCameras.set(camId, {
+                element: gridItem,
+                active: true,
+                lastFrame: null,
+                trackingEnabled: false
+            });
+        }
+    },
+
+    updateCameraFrame(cameraId, frame) {
+        const normalizedId = Utils.normalizeCameraId(cameraId);
+        const cameraData = state.subscribedCameras.get(normalizedId);
+        
+        if (cameraData) {
+            const img = cameraData.element.querySelector(".camera-feed");
+            if (img) {
+                img.src = `data:image/jpeg;base64,${frame}`;
+                cameraData.lastFrame = frame;
             }
         }
-    };
+    }
+};
 
     // ==================== Módulo de Comunicación ====================
     const Comms = {
@@ -236,8 +295,26 @@ const CameraSystem = (() => {
                 console.error("Socket connection error:", err);
                 Utils.showError("Error de conexión con el servidor");
             });
+        },    updateTrackingStatus(cameraId, isActive) {
+            const normalizedId = Utils.normalizeCameraId(cameraId);
+            const cameraData = state.subscribedCameras.get(normalizedId);
+            
+            if (cameraData) {
+                cameraData.trackingEnabled = isActive;
+                const radioOn = cameraData.element.querySelector(`input[name="tracking_${normalizedId}"][value="on"]`);
+                const radioOff = cameraData.element.querySelector(`input[name="tracking_${normalizedId}"][value="off"]`);
+                
+                if (radioOn && radioOff) {
+                    if (isActive) {
+                        radioOn.checked = true;
+                    } else {
+                        radioOff.checked = true;
+                    }
+                }
+            }
         }
     };
+
 
     // ==================== Módulo de Control ====================
     const Controller = {

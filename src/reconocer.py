@@ -76,7 +76,6 @@ def reconocer():
 
 
 
-
 def dibujar_resultados(frame, recognition_data):
     """Dibuja los resultados guardados en el frame"""
     for (x1, y1, x2, y2), nombre, color in zip(recognition_data['boxes'], 
@@ -106,7 +105,6 @@ def procesar_frame(frame, camara_id):
         colors = []
         boxes_to_draw = []
         
-        # Procesamiento de rostros en lote para mejor rendimiento
         embeddings = []
         for rostro in rostros:
             try:
