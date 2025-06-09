@@ -8,7 +8,7 @@ from flask_socketio import join_room, leave_room
 from flask import request
 import logging
 import time
-from reconocer import procesar_frame
+from reconocer import procesar_frame , dibujar_resultados
 
 # Configure logging
 logging.basicConfig(
@@ -99,11 +99,20 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
     logger.info(f"[THREAD-START] Iniciando hilo persistente para cámara {nombre} (ID: {camara_id})")
     
     # Configuración de procesamiento
-    skip_frames = 10  # Procesar 1 de cada 3 frames para reducir carga
+    skip_frames = 10  # Procesar 1 de cada 3 frames
     frame_counter = 0
     
+    # Variables para retención de resultados
+    last_recognition_results = {
+        'boxes': [],
+        'names': [],
+        'colors': [],
+        'expire_count': 0
+    }
+    frames_to_keep_results = 12  # Mantener resultados por 5 frames
+    
     while not stop_event.is_set():
-        # Conexión inicial (código existente)
+        # Conexión inicial
         with hilos_lock:
             hilos_camaras[camara_id].update({
                 'connecting': True,
@@ -115,7 +124,7 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
         
         cap = None
         try:
-            # Configuración de conexión (código existente)
+            # Configuración de conexión
             if tipo_camara == 'USB':
                 cap = cv2.VideoCapture(int(fuente), cv2.CAP_V4L2)
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -144,7 +153,7 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
                 })
             actualizar_estado_camara(camara_id, 'Activo')
             
-            # Bucle principal de captura - MODIFICADO
+            # Bucle principal de captura
             while not stop_event.is_set():
                 ret, frame = cap.read()
                 
@@ -157,15 +166,22 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
                 frame_counter += 1
                 frame_procesado = frame.copy()
                 
-                # Procesamiento con reconocimiento siempre activo pero optimizado
+                # Procesamiento con reconocimiento
                 if frame_counter % skip_frames == 0:
                     try:
-                        frame_procesado, _ = procesar_frame(frame)
+                        frame_procesado, recognition_data = procesar_frame(frame,camara_id)
+                        last_recognition_results = recognition_data
+                        last_recognition_results['expire_count'] = frames_to_keep_results
+                        
                         with hilos_lock:
                             hilos_camaras[camara_id]['last_processed_frame'] = frame_procesado
                     except Exception as e:
                         logger.error(f"Error en procesamiento: {str(e)}")
-                        frame_procesado = frame
+                else:
+                    # Usar los resultados anteriores pero reduciendo el contador
+                    if last_recognition_results.get('expire_count', 0) > 0:
+                        last_recognition_results['expire_count'] -= 1
+                        frame_procesado = dibujar_resultados(frame.copy(), last_recognition_results)
                 
                 # Envío del frame
                 try:
@@ -193,7 +209,7 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
         except Exception as e:
             logger.error(f"[ERROR] Error en cámara {nombre}: {str(e)}")
             actualizar_estado_camara(camara_id, 'Inactivo')
-            time.sleep(1)  # Pequeña pausa antes de reintentar
+            time.sleep(1)
         
         finally:
             if cap is not None:
@@ -216,7 +232,7 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
     logger.info(f"[HILO-TERMINADO] Hilo persistente de {nombre} finalizado")
     with hilos_lock:
         if camara_id in hilos_camaras:
-            hilos_camaras[camara_id]['running'] = False  
+            hilos_camaras[camara_id]['running'] = False
         
         
 
