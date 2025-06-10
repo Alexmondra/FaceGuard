@@ -41,6 +41,8 @@ def poner_camaras_inactivas():
     finally:
         conn.close()
 
+
+
 def conectar_db():
     try:
         conexion = mysql.connector.connect(

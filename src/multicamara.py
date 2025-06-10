@@ -56,44 +56,57 @@ def listar_hilos_camaras():
 
 
 
-def cerrarhiloCamara(camara_id):
-    """Cierra el hilo y libera la cámara de manera forzosa"""
+def cerrarhiloCamara(camara_id, timeout=3.0):
     with hilos_lock:
         if camara_id not in hilos_camaras:
             logger.warning(f"No se encontró hilo para cámara {camara_id}")
             return False
 
-        data = hilos_camaras[camara_id]
-        data['stop_event'].set()
+        if not hilos_camaras[camara_id].get('running', False):
+            logger.info(f"El hilo de cámara {camara_id} ya estaba detenido")
+            del hilos_camaras[camara_id]
+            return True
+
+        # Marcar como terminando y obtener referencias
+        hilos_camaras[camara_id]['terminating'] = True
+        data = hilos_camaras[camara_id].copy()
+        stop_event = data['stop_event']
         hilo = data['thread']
         cap = data.get('cap')
 
-    # Liberación forzosa de la cámara
-    if cap is not None:
-        try:
-            cap.release()
-            time.sleep(0.5)
-            cv2.destroyAllWindows()
-            logger.info(f"Recursos de cámara {camara_id} liberados")
-        except Exception as e:
-            logger.error(f"Error liberando cámara {camara_id}: {str(e)}")
+    try:
+        # Paso 1: Señal de parada
+        stop_event.set()
+        logger.debug(f"Señal de parada enviada a cámara {camara_id}")
 
-    # Espera controlada para el hilo
-    if hilo.is_alive():
-        hilo.join(timeout=1.0)
-        if hilo.is_alive():
-            logger.warning(f"Forzando terminación del hilo {camara_id}")
+        # Paso 2: Liberar recursos de cámara
+        if cap is not None:
             try:
-                hilo._stop()
-            except:
-                pass
+                cap.release()
+                logger.debug(f"Recursos de cámara {camara_id} liberados")
+            except Exception as e:
+                logger.error(f"Error liberando cámara {camara_id}: {str(e)}")
 
-    with hilos_lock:
-        if camara_id in hilos_camaras:
-            del hilos_camaras[camara_id]
-    
-    return True
+        # Paso 3: Esperar terminación del hilo
+        if hilo.is_alive():
+            logger.debug(f"Esperando terminación del hilo {camara_id} (timeout={timeout}s)")
+            hilo.join(timeout=timeout)
+            
+            if hilo.is_alive():
+                logger.warning(f"El hilo {camara_id} no respondió al timeout")
+                # No usar _stop() por ser inseguro
 
+        # Paso 4: Limpieza final
+        with hilos_lock:
+            if camara_id in hilos_camaras:
+                del hilos_camaras[camara_id]
+
+        logger.info(f"Hilo de cámara {camara_id} cerrado correctamente")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error crítico al cerrar hilo {camara_id}: {str(e)}")
+        return False
 # Función que ejecuta el hilo para una cámara
 # --------------------------
 # NUEVAS FUNCIONES MODULARES
@@ -115,11 +128,10 @@ def conectar_camara(tipo_camara, fuente, stop_event):
         # Espera activa para conexión
         inicio = time.time()
         while not cap.isOpened() and (time.time() - inicio) < 3 and not stop_event.is_set():
-            time.sleep(0.1)
+            time.sleep(0.0)
         
         if not cap.isOpened() or stop_event.is_set():
             raise ConnectionError("No se pudo conectar a la cámara")
-        
         return cap
     
     except Exception as e:
@@ -207,7 +219,6 @@ def realizar_seguimiento(frame, camara_id, recognition_data, yolo_model, persona
     return personas_seguimiento
 
 def seguir_personas_registradas(frame, yolo_model, personas_registradas):
-    """Sigue a personas registradas usando solo detección YOLO"""
     personas_seguimiento = []
     yolo_detections = detectar_personas_con_yolo(frame, yolo_model)
     
@@ -259,34 +270,25 @@ def enviar_frame(camara_id, frame, enviar_frames=True):
 # --------------------------
 
 def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
-    """Thread persistente que maneja conexión y reconexión automática de la cámara"""
-    logger.info(f"[THREAD-START] Iniciando hilo persistente para cámara {nombre} (ID: {camara_id})")
+    logger.info(f"[THREAD-START] Iniciando hilo para cámara {nombre} (ID: {camara_id})")
     global personas_registradas
     
-    # Configuración de procesamiento
-    skip_frames = 10  # Procesar reconocimiento cada 10 frames
+    skip_frames_yolo = 10  # YOLO cada 10 frames (solo si seguimiento activo)
+    skip_frames_recon = 30  # Reconocimiento cada 30 frames
     frame_counter = 0
     frames_to_keep_results = 15  
-    yolo_model = inicializar_modelo_yolo()
+    yolo_model = None  # Se inicializa solo si es necesario
     
-    
-    # Variables para retención de resultados
     last_recognition_results = {
         'boxes': [],
         'names': [],
         'colors': [],
         'expire_count': 0
     }
-    last_yolo_results = {
-        'boxes': [],
-        'confidences': [],
-        'expire_count': 0
-    }
-    # Estado de seguimiento para esta cámara
+    
     personas_seguimiento = []
     
     while not stop_event.is_set():
-        # Conexión inicial
         with hilos_lock:
             hilos_camaras[camara_id].update({
                 'connecting': True,
@@ -298,7 +300,6 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
         
         cap = None
         try:
-            # Conectar a la cámara
             cap = conectar_camara(tipo_camara, fuente, stop_event)
             logger.info(f"[CONEXIÓN-EXITOSA] {nombre} conectada")
             
@@ -307,12 +308,11 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
                     'activo': True,
                     'connecting': False,
                     'cap': cap,
-                    'last_success': time.time(),
-                    'seguimiento_activo': True
+                    'last_success': time.time()
                 })
             actualizar_estado_camara(camara_id, 'Activo')
             
-            # Bucle principal de captura
+            # Bucle principal optimizado
             while not stop_event.is_set():
                 ret, frame = cap.read()
                 
@@ -325,61 +325,70 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
                 frame_counter += 1
                 frame_procesado = frame.copy()
                 
-                # Obtener estado de seguimiento actualizado
+                # Obtener estado de seguimiento
                 with hilos_lock:
                     seguimiento_activo = hilos_camaras[camara_id].get('seguimiento_activo', False)
                 
-                # Procesamiento con reconocimiento (cada skip_frames)
-                if frame_counter % skip_frames == 0:
+                # Inicializar YOLO solo si es necesario
+                if seguimiento_activo and yolo_model is None:
                     try:
-                        # Procesar reconocimiento facial
+                        yolo_model = inicializar_modelo_yolo()
+                        logger.info(f"[YOLO-INIT] Modelo cargado para cámara {camara_id}")
+                    except Exception as e:
+                        logger.error(f"[YOLO-ERROR] {str(e)}")
+                        yolo_model = None
+                
+                # Procesamiento de reconocimiento (cada 30 frames)
+                if frame_counter % skip_frames_recon == 0:
+                    try:
                         frame_procesado, recognition_data = procesar_reconocimiento(frame, camara_id)
                         last_recognition_results = recognition_data
-                        
-                        # Si hay seguimiento activo, procesar asociaciones
-                        if seguimiento_activo:
-                            logger.info(f"[SEGUIMIENTO] Procesando seguimiento para cámara {camara_id}")
-                            
-                            personas_seguimiento = realizar_seguimiento(
-                                frame, camara_id, recognition_data, yolo_model, personas_registradas
-                            )
+                        last_recognition_results['expire_count'] = frames_to_keep_results
                         
                         with hilos_lock:
                             hilos_camaras[camara_id]['last_processed_frame'] = frame_procesado
-                    
                     except Exception as e:
-                        logger.error(f"Error en procesamiento: {str(e)}")
-                else:
-                    # Entre frames de reconocimiento, usar YOLO para seguir personas registradas
-                    if seguimiento_activo and personas_registradas:
-                        try:
+                        logger.error(f"[RECON-ERROR] {str(e)}")
+                
+                # Procesamiento YOLO (cada 10 frames, solo si seguimiento activo)
+                if seguimiento_activo and frame_counter % skip_frames_yolo == 0 and yolo_model:
+                    try:
+                        if frame_counter % skip_frames_recon == 0:  # Si ya tenemos reconocimiento
+                            personas_seguimiento = realizar_seguimiento(
+                                frame, camara_id, last_recognition_results, yolo_model, personas_registradas
+                            )
+                        else:  # Solo seguimiento YOLO
                             personas_seguimiento = seguir_personas_registradas(
                                 frame, yolo_model, personas_registradas
                             )
-                        except Exception as e:
-                            logger.error(f"Error en seguimiento YOLO: {str(e)}")
-                    
-                    # Dibujar resultados anteriores
-                    if last_recognition_results.get('expire_count', 0) > 0:
-                        last_recognition_results['expire_count'] -= 1
-                        frame_procesado = dibujar_resultados(frame.copy(), last_recognition_results)
+                    except Exception as e:
+                        logger.error(f"[YOLO-PROC-ERROR] {str(e)}")
+                        yolo_model = None  # Reiniciar modelo si falla
                 
-                # Dibujar seguimiento en TODOS los frames si hay personas a seguir
+                # Dibujar resultados guardados entre frames de procesamiento
+                if last_recognition_results.get('expire_count', 0) > 0:
+                    last_recognition_results['expire_count'] -= 1
+                    frame_procesado = dibujar_resultados(frame.copy(), last_recognition_results)
+                
+                # Dibujar seguimiento si está activo
                 if seguimiento_activo and personas_seguimiento:
                     frame_procesado = dibujar_seguimiento(frame_procesado, personas_seguimiento)
                 
-                # Envío del frame
+                # Envío eficiente del frame
                 enviar_frame(camara_id, frame_procesado)
                 
-                # Control FPS más flexible
-                time.sleep(0.03 if frame_counter % skip_frames == 0 else 0.01)
+                # Control FPS dinámico
+                delay = 0.03 if (frame_counter % skip_frames_recon == 0 or 
+                               (seguimiento_activo and frame_counter % skip_frames_yolo == 0)) else 0.01
+                time.sleep(delay)
         
         except Exception as e:
-            logger.error(f"[ERROR] Error en cámara {nombre}: {str(e)}")
-            actualizar_estado_camara(camara_id, 'Inactivo')
+            logger.error(f"[ERROR] {nombre}: {str(e)}")
+            #actualizar_estado_camara(camara_id, 'Inactivo')
             time.sleep(1)
         
         finally:
+            # Liberar recursos
             if cap is not None:
                 try:
                     cap.release()
@@ -392,59 +401,74 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
                     'cap': None
                 })
             
+            # Liberar modelo YOLO
+            yolo_model = None
+            
             if not stop_event.is_set():
                 logger.info(f"[RECONEXIÓN] Esperando 5 segundos para reconectar {nombre}")
                 time.sleep(5)
     
-    # Limpieza al terminar el hilo
+    # Limpieza final
     with hilos_lock:
         personas_registradas = {k: v for k, v in personas_registradas.items() 
-            if v['nombre'] not in [p['nombre'] for p in personas_seguimiento]}
+                              if v['nombre'] not in [p['nombre'] for p in personas_seguimiento]}
         
         if camara_id in seguimiento_por_camara:
             del seguimiento_por_camara[camara_id]
     
-    logger.info(f"[HILO-TERMINADO] Hilo persistente de {nombre} finalizado")
+    logger.info(f"[HILO-TERMINADO] {nombre} finalizado")
     with hilos_lock:
         if camara_id in hilos_camaras:
             hilos_camaras[camara_id]['running'] = False
             
 
 def verificar_y_lanzar_camaras():
-    logger.info("[MONITOR] Verificando cámaras nuevas")
+    """Verifica y lanza hilos para cámaras que no tienen hilo activo"""
+    logger.info("[MONITOR] Verificando cámaras nuevas o modificadas")
     conn = conectar_db()
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT id, nombre, tipo_camara, fuente FROM camaras")
         
         with hilos_lock:
-            # Solo crear hilos para cámaras que no tienen uno
-            for camara in cursor.fetchall():
+            # Obtener cámaras que necesitan hilo nuevo
+            camaras_para_lanzar = [
+                camara for camara in cursor.fetchall()
+                if camara['id'] not in hilos_camaras or 
+                   not hilos_camaras[camara['id']].get('running', False) or
+                   hilos_camaras[camara['id']].get('terminating', False)
+            ]
+            
+            # Crear hilos para las cámaras que lo necesitan
+            for camara in camaras_para_lanzar:
                 cam_id = camara['id']
-                if cam_id not in hilos_camaras:
-                    logger.info(f"[NUEVO-HILO] Creando hilo persistente para {camara['nombre']}")
-                    stop_event = threading.Event()
-                    thread = threading.Thread(
-                        target=hilo_camara,
-                        args=(cam_id, camara['nombre'], camara['tipo_camara'], camara['fuente'], stop_event),
-                        daemon=True
-                    )
+                if cam_id in hilos_camaras and hilos_camaras[cam_id].get('terminating', False):
+                    continue  # Esperar a que termine completamente
                     
-                    hilos_camaras[cam_id] = {
-                        'thread': thread,
-                        'stop_event': stop_event,
-                        'nombre': camara['nombre'],
-                        'running': True,
-                        'activo': False,
-                        'seguimiento_activo': False
-                    }
-                    thread.start()
-                    
+                logger.info(f"[NUEVO-HILO] Creando hilo para {camara['nombre']}")
+                stop_event = threading.Event()
+                thread = threading.Thread(
+                    target=hilo_camara,
+                    args=(cam_id, camara['nombre'], camara['tipo_camara'], camara['fuente'], stop_event),
+                    daemon=True,
+                    name=f"Camara_{cam_id}_Thread"
+                )
+                
+                hilos_camaras[cam_id] = {
+                    'thread': thread,
+                    'stop_event': stop_event,
+                    'nombre': camara['nombre'],
+                    'running': True,
+                    'activo': False,
+                    'seguimiento_activo': True,
+                    'terminating': False
+                }
+                thread.start()
+                
     except Exception as e:
         logger.error(f"[MONITOR-ERROR] Error: {str(e)}")
     finally:
         conn.close()
-
 
 def actualizar_estado_camara(camara_id, estado):
     """Actualiza el estado en la base de datos"""
@@ -460,6 +484,17 @@ def actualizar_estado_camara(camara_id, estado):
         
 
 # Handlers de Socket.IO
+
+@socketio.on('unsubscribe_camera')
+def handle_unsubscribe_camera(data):
+    camara_id = data.get('camera_id')
+    if camara_id:
+        leave_room(f'camara_{camara_id}')
+        logger.info(f"Cliente {request.sid} desuscrito de cámara {camara_id}")
+        
+        
+
+
 @socketio.on('subscribe_camera')
 def handle_subscribe_camera(data):
     camara_id = data.get('camera_id')
@@ -467,16 +502,8 @@ def handle_subscribe_camera(data):
         join_room(f'camara_{camara_id}')
         with hilos_lock:
             if camara_id in hilos_camaras:
-                hilos_camaras[camara_id]['enviar_frames'] = True
-                logger.info(f"Cliente {request.sid} suscrito a cámara {camara_id}")
-
-@socketio.on('unsubscribe_camera')
-def handle_unsubscribe_camera(data):
-    """Único handler para desuscripción"""
-    camara_id = data.get('camera_id')
-    if camara_id:
-        leave_room(f'camara_{camara_id}')
-        logger.info(f"Cliente {request.sid} desuscrito de cámara {camara_id}")
+                pass
+        logger.info(f"Cliente {request.sid} suscrito a cámara {camara_id}")
         
         
 # Nuevos handlers para control por cámara

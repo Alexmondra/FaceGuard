@@ -8,6 +8,7 @@ import threading
 import webbrowser
 from conexiondb import conectar_db,crear_tablas_si_no_existen, cargar_todos_embeddings_faiss ,poner_camaras_inactivas
 from registros import rutas_personas
+from reconocidos import rutas_detectados
 from utils import socketio, jwt
 from camaras import rutas_camaras
 import multicamara
@@ -25,7 +26,6 @@ app.config['JWT_SECRET_KEY'] = 'super-secret'  # Cambiar en producción
 # Configure JWT
 socketio.init_app(app)
 jwt.init_app(app)
-
 
 
 multicamara.socketio = socketio
@@ -48,7 +48,6 @@ logger = logging.getLogger(__name__)
 db = conectar_db()
 if db:
     crear_tablas_si_no_existen(db)
-    poner_camaras_inactivas()
     db.close()
     
     
@@ -95,6 +94,8 @@ cargar_todos_embeddings_faiss()
 
 app.register_blueprint(rutas_camaras, url_prefix='/camara')
 app.register_blueprint(rutas_personas, url_prefix='/registros')
+app.register_blueprint(rutas_detectados, url_prefix='/detectados')
+
 @app.route('/persona/reconocer', methods=['POST'])
 def route_reconocer():
     return reconocer()
@@ -114,12 +115,12 @@ def v():
 
 
 def ciclo_verificacion():
-    socketio.sleep(20)  # Espera inicial para que el servidor se estabilice
+    socketio.sleep()  # Espera inicial para que el servidor se estabilice
     multicamara.verificar_y_lanzar_camaras()
 
 if __name__ == "__main__":
     try:
-        multicamara.verificar_y_lanzar_camaras()
+        ciclo_verificacion()
         #thread_verificacion = threading.Thread(target=ciclo_verificacion, daemon=True)
         #thread_verificacion.start()
         #webbrowser.open_new("http://localhost:5000/")

@@ -3,7 +3,7 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from conexiondb import conectar_db
 from flask_jwt_extended import jwt_required, get_jwt_identity , get_jwt
-from multicamara import cerrarhiloCamara
+from multicamara import cerrarhiloCamara , verificar_y_lanzar_camaras
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -38,13 +38,13 @@ def obtener_usuario_actual():
 # Función para obtener cámaras según el rol
 def obtener_camaras_por_rol(cursor, user_id, rol):
     if rol == 'admin':
-        cursor.execute("SELECT * FROM camaras")
+        cursor.execute("SELECT * FROM camaras where fecha_eliminacion IS NULL")
     else:
         cursor.execute("""
             SELECT c.* 
             FROM camaras c
             INNER JOIN usuario_camara uc ON c.id = uc.camara_id
-            WHERE uc.usuario_id = %s
+            WHERE uc.usuario_id = %s AND c.fecha_eliminacion IS NULL
         """, (user_id,))
     return cursor.fetchall()
 
@@ -172,7 +172,7 @@ def registrar_camara():
         # Confirmar transacciones
         conexion.commit()
         conexion.close()
-
+        verificar_y_lanzar_camaras()
         logger.info(f"Nueva cámara registrada con ID: {nueva_camara_id} y asignada al usuario: {current_user}")
         return jsonify({'id_camara': nueva_camara_id}), 201
     except Exception as e:
@@ -206,7 +206,8 @@ def editar_camara(camara_id):
             cursor.execute(query_verificar_acceso, (user_data['id'], camara_id))
             if not cursor.fetchone():
                 return jsonify({'error': 'No tienes permiso para editar esta cámara'}), 403
-        
+        if not cerrarhiloCamara(camara_id):
+            return False
         # Actualizar datos de la cámara
         query_actualizar = """
         UPDATE camaras
@@ -225,7 +226,7 @@ def editar_camara(camara_id):
         cursor.execute(query_actualizar, valores_actualizar)
         conexion.commit()
         conexion.close()
-
+        verificar_y_lanzar_camaras()
         logger.info(f"Cámara ID {camara_id} actualizada por el usuario ID {user_data['id']}")
         return jsonify({'mensaje': 'Cámara actualizada exitosamente'}), 200
     except Exception as e:
@@ -237,31 +238,31 @@ def editar_camara(camara_id):
 @jwt_required()
 def eliminar_camara(camara_id):
     try:
-        # 2. Proceso de eliminación en BD
         conexion = conectar_db()
-        cursor = cursor = conexion.cursor(dictionary=True) 
-        
+        cursor = conexion.cursor(dictionary=True)
+
         cursor.execute("SELECT estado FROM camaras WHERE id = %s", (camara_id,))
         estado = cursor.fetchone()
-        if estado and estado['estado'] == 'Activo':
-            cerrarhiloCamara(camara_id)
+
         
-        # Actualiza detectados (camara_id -> NULL)
-        cursor.execute("UPDATE detectados SET camara_id = NULL WHERE camara_id = %s", (camara_id,))
-
-        # Elimina relaciones en usuario_camara
-        cursor.execute("DELETE FROM usuario_camara WHERE camara_id = %s", (camara_id,))
-
-        # Elimina la cámara
-        cursor.execute("DELETE FROM camaras WHERE id = %s", (camara_id,))
+        if not cerrarhiloCamara(camara_id):
+            return jsonify({'error': 'No se pudo cerrar el hilo de la cámara'}), 400
+        cursor.execute(
+            """
+            UPDATE camaras 
+            SET estado = 'Desactivado', 
+                fecha_eliminacion = NOW() 
+            WHERE id = %s
+            """, 
+            (camara_id,)
+        )
 
         conexion.commit()
         conexion.close()
-        
-        logger.info(f"Cámara {camara_id} eliminada completamente del sistema")
-        return jsonify({'mensaje': 'Cámara eliminada exitosamente'}), 200
+        return jsonify({'mensaje': 'Cámara desactivada exitosamente'}), 200
 
     except Exception as e:
-        logger.error(f"Error al eliminar cámara ID {camara_id}: {str(e)}")
-        return jsonify({'error': 'Error interno al eliminar la cámara'}), 500
+        logger.error(f"Error al desactivar cámara ID {camara_id}: {str(e)}")
+        return jsonify({'error': 'Error interno al desactivar la cámara'}), 500
+
 

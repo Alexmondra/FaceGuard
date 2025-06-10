@@ -1,11 +1,15 @@
+from flask import Flask, Blueprint, jsonify, request, send_from_directory, current_app
 from conexiondb import conectar_db
 import os
 from datetime import datetime
 import uuid
 import cv2
+from collections import defaultdict
 
-# Configuración de directorios
+
+# Configuración
 IMAGES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "imagenes_detectados")
+rutas_detectados = Blueprint('rutas_detectados', __name__)
 
 def guardarReconocido(frame, persona_id, camara_id):
     try:
@@ -61,3 +65,58 @@ def guardarReconocido(frame, persona_id, camara_id):
     finally:
         if 'conexion' in locals():
             conexion.close()
+            
+# --------------------------
+# MOSTTRAAAAAAAAAAAAAAAAA
+# --------------------------         
+@rutas_detectados.route('/registros', methods=['GET'])
+def get_detections():
+    try:
+        conn = conectar_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        query = """
+        SELECT 
+            d.id, d.fecha_hora, d.foto_captura, d.persona_id, d.camara_id,
+            p.dni as persona_dni, p.nombres as persona_nombres, 
+            p.apellidos as persona_apellidos, p.fecha_nacimiento as persona_fecha_nacimiento,
+            p.genero as persona_genero, p.descripcion as persona_descripcion,
+            c.nombre as camara_nombre, c.local as camara_local, 
+            c.ubicacion as camara_ubicacion, c.tipo_camara as camara_tipo,
+            c.estado as camara_estado
+        FROM detectados d
+        LEFT JOIN personas p ON d.persona_id = p.id
+        LEFT JOIN camaras c ON d.camara_id = c.id
+        ORDER BY d.fecha_hora DESC
+        """
+        
+        cursor.execute(query)
+        detections = cursor.fetchall()
+        
+        structured_data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        
+        for det in detections:
+            fecha = det['fecha_hora'] if isinstance(det['fecha_hora'], datetime) else datetime.strptime(det['fecha_hora'], '%Y-%m-%d %H:%M:%S')
+            year = str(fecha.year)
+            month = f"{fecha.month:02d}"
+            day = f"{fecha.day:02d}"
+            
+            structured_data[year][month][day].append(det)
+        
+        return jsonify(structured_data)
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
+
+@rutas_detectados.route('/images/<path:filename>', methods=['GET'])
+def serve_image(filename):
+    try:
+        return send_from_directory(IMAGES_DIR, filename)
+    except FileNotFoundError:
+        return jsonify({'error': 'Imagen no encontrada'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

@@ -1,0 +1,12 @@
+
+.folder-structure { cursor: pointer; }
+.folder-icon { color: #FFC107; }
+.image-thumbnail {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.image-thumbnail:hover { transform: scale(1.03); }
+.person-info-img { max-height: 400px; object-fit: contain; }

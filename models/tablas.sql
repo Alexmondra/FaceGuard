@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS `camaras` (
   `fuente` varchar(255) NOT NULL,
   `estado` enum('Activo','Inactivo','Desactivado') DEFAULT 'Inactivo',
   `fecha_registro` timestamp NULL DEFAULT current_timestamp(),
+  `fecha_eliminacion` VARCHAR(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
