@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        .actions button {
+            margin-right: 5px;
+        }
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 50%;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gestión de Usuarios</h1>
+    <table id="userTable">
+        <thead>
+            <tr>
+                <th>Avatar</th>
+                <th>Email</th>
+                <th>Estado</th>
+                <th>Fecha de Registro</th>
+                <th>ID</th>
+                <th>Rol</th>
+                <th>Usuario</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- Modal para editar usuario -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Editar Usuario</h2>
+            <form id="editForm">
+                <input type="hidden" id="editUserId">
+                <div class="form-group">
+                    <label for="editUsername">Nombre de usuario:</label>
+                    <input type="text" id="editUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="editEmail">Email:</label>
+                    <input type="email" id="editEmail" required>
+                </div>
+                <div class="form-group" id="rolGroup">
+                    <label for="editRol">Rol:</label>
+                    <select id="editRol">
+                        <option value="usuario">Usuario</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group" id="currentPasswordGroup">
+                    <label for="editCurrentPassword">Contraseña actual:</label>
+                    <input type="password" id="editCurrentPassword">
+                </div>
+                <div class="form-group" id="newPasswordGroup">
+                    <label for="editNewPassword">Nueva contraseña:</label>
+                    <input type="password" id="editNewPassword">
+                </div>
+                <div class="form-group" id="confirmPasswordGroup">
+                    <label for="editConfirmPassword">Confirmar nueva contraseña:</label>
+                    <input type="password" id="editConfirmPassword">
+                </div>
+                <button type="submit">Guardar cambios</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            const API_BASE_URL = "http://127.0.0.1:5000";
+            const token = localStorage.getItem("accessToken");
+            let currentUserData = {};
+
+            if (!token) {
+                alert("No estás autenticado. Redirigiendo al login...");
+                window.location.href = "/login.html";
+                return;
+            }
+
+            // Obtener datos del usuario actual
+            async function getCurrentUser() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/protected`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('Error al obtener datos del usuario:', error);
+                    return null;
+                }
+            }
+
+            async function fetchData() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/obtenerUsuarios`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            alert("Sesión expirada. Por favor, inicia sesión nuevamente.");
+                            window.location.href = "/login.html";
+                            return null;
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    console.error('Error al obtener los datos:', error);
+                    return null;
+                }
+            }
+
+            const tableBody = document.querySelector('#userTable tbody');
+            const modal = document.getElementById('editModal');
+            const closeBtn = document.querySelector('.close');
+            const editForm = document.getElementById('editForm');
+
+            // Configurar modal
+            closeBtn.onclick = function() {
+                modal.style.display = "none";
+            }
+
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = "none";
+                }
+            }
+
+            function populateTable(data) {
+                tableBody.innerHTML = '';
+                
+                // Guardar datos del usuario actual
+                currentUserData = {
+                    id: data.current_user_id,
+                    isAdmin: data.es_admin
+                };
+
+                // Si no es admin y no hay usuarios, mostrar mensaje
+                if (!currentUserData.isAdmin && (!data.usuarios || data.usuarios.length === 0)) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td colspan="8">No tienes permisos para ver otros usuarios</td>`;
+                    tableBody.appendChild(row);
+                    return;
+                }
+
+                data.usuarios.forEach(user => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><img src="${user.avatar_url}" alt="Avatar" width="50"></td>
+                        <td>${user.email}</td>
+                        <td>${user.estado}</td>
+                        <td>${new Date(user.fecha_registro).toLocaleString()}</td>
+                        <td>${user.id}</td>
+                        <td>${user.rol}</td>
+                        <td>${user.username}</td>
+                        <td class="actions">
+                            <button onclick="openEditModal(${user.id}, '${user.username}', '${user.email}', '${user.rol}')">Editar</button>
+                            ${currentUserData.isAdmin && user.id !== currentUserData.id ? 
+                              `<button onclick="deleteUser(${user.id})">Eliminar</button>` : ''}
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            window.openEditModal = function(userId, username, email, rol) {
+                document.getElementById('editUserId').value = userId;
+                document.getElementById('editUsername').value = username;
+                document.getElementById('editEmail').value = email;
+                document.getElementById('editRol').value = rol;
+
+                // Mostrar/ocultar campos según permisos
+                const isCurrentUser = userId == currentUserData.id;
+                const rolGroup = document.getElementById('rolGroup');
+                const passwordFields = document.getElementById('currentPasswordGroup');
+                const newPasswordFields = document.getElementById('newPasswordGroup');
+                const confirmPasswordFields = document.getElementById('confirmPasswordGroup');
+
+                if (currentUserData.isAdmin && !isCurrentUser) {
+                    // Admin editando a otro usuario - solo puede cambiar rol
+                    rolGroup.style.display = 'block';
+                    passwordFields.style.display = 'none';
+                    newPasswordFields.style.display = 'none';
+                    confirmPasswordFields.style.display = 'none';
+                } else {
+                    // Usuario editándose a sí mismo - puede cambiar datos pero no rol
+                    rolGroup.style.display = isCurrentUser ? 'none' : 'block';
+                    passwordFields.style.display = isCurrentUser ? 'block' : 'none';
+                    newPasswordFields.style.display = isCurrentUser ? 'block' : 'none';
+                    confirmPasswordFields.style.display = isCurrentUser ? 'block' : 'none';
+                }
+
+                modal.style.display = "block";
+            };
+
+            // Manejar envío del formulario de edición
+            editForm.onsubmit = async function(e) {
+                e.preventDefault();
+                
+                const userId = document.getElementById('editUserId').value;
+                const username = document.getElementById('editUsername').value;
+                const email = document.getElementById('editEmail').value;
+                const rol = document.getElementById('editRol').value;
+                const currentPassword = document.getElementById('editCurrentPassword').value;
+                const newPassword = document.getElementById('editNewPassword').value;
+                const confirmPassword = document.getElementById('editConfirmPassword').value;
+
+                // Validar contraseñas si se están cambiando
+                if (newPassword && newPassword !== confirmPassword) {
+                    alert("Las contraseñas nuevas no coinciden");
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/editarUsuario`, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            user_id: userId,
+                            username: username,
+                            email: email,
+                            rol: rol,
+                            current_password: currentPassword,
+                            new_password: newPassword,
+                            confirm_new_password: confirmPassword
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.mensaje || "Error al actualizar el usuario");
+                    }
+
+                    const result = await response.json();
+                    if (result.success) {
+                        alert("Usuario actualizado correctamente");
+                        modal.style.display = "none";
+                        // Recargar la tabla
+                        const data = await fetchData();
+                        if (data && data.success) {
+                            populateTable(data);
+                        }
+                    } else {
+                        alert(result.mensaje || "Error al actualizar el usuario");
+                    }
+                } catch (error) {
+                    console.error('Error al actualizar usuario:', error);
+                    alert(error.message || "Error al actualizar el usuario");
+                }
+            };
+
+            window.deleteUser = async function(userId) {
+                if (userId == currentUserData.id) {
+                    alert("No puedes eliminarte a ti mismo");
+                    return;
+                }
+
+                if (confirm(`¿Estás seguro de que deseas eliminar al usuario con ID: ${userId}?`)) {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/api/eliminarUsuario/${userId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+                        if (result.success) {
+                            alert("Usuario eliminado correctamente");
+                            // Recargar la tabla
+                            const data = await fetchData();
+                            if (data && data.success) {
+                                populateTable(data);
+                            }
+                        } else {
+                            alert(result.mensaje || "Error al eliminar el usuario");
+                        }
+                    } catch (error) {
+                        console.error('Error al eliminar usuario:', error);
+                        alert("Error al eliminar el usuario");
+                    }
+                }
+            };
+
+            // Obtener datos iniciales
+            currentUserData = await getCurrentUser();
+            const data = await fetchData();
+            if (data && data.success) {
+                populateTable(data);
+            } else {
+                console.error('No se pudieron cargar los datos de usuarios.');
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="8">Error al cargar los datos de usuarios</td>`;
+                tableBody.appendChild(row);
+            }
+        });
+    </script>
+</body>
+</html>

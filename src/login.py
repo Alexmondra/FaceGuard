@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, make_response
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity,get_jwt
 from flask_cors import CORS
 from conexiondb import conectar_db
 import bcrypt
@@ -130,13 +130,163 @@ def api_guardarUsuario():
                 logger.warning(f"Error al cerrar la conexión: {close_error}")
 
 
-# Error handling
+@auth_bp.route("/editarUsuario", methods=["PUT"])
+@jwt_required()
+def editar_usuario():
+    con = None
+    try:
+        current_user_id = get_jwt_identity()
+        user_claims = get_jwt()
+        current_user_rol = user_claims.get('rol', 'usuario')
+        
+        con = conectar_db()
+        datos_edicion = request.json
+   
+        user_id_editar = datos_edicion.get('user_id', current_user_id)
+        
+        if current_user_rol != 'admin' and str(user_id_editar) != str(current_user_id):
+            return jsonify({"mensaje": "No tienes permisos para editar este usuario", "success": False}), 403
+
+        with con.cursor(dictionary=True) as cursor:
+            sql_get_user = "SELECT id, username, email, password_hash, rol FROM usuarios WHERE id = %s"
+            cursor.execute(sql_get_user, (user_id_editar,))
+            usuario = cursor.fetchone()
+
+            if not usuario:
+                return jsonify({"mensaje": "Usuario no encontrado", "success": False}), 404
+
+        nuevo_username = datos_edicion.get('username', usuario['username'])
+        nuevo_rol = datos_edicion.get('rol', usuario['rol']) if current_user_rol == 'admin' else usuario['rol']
+        
+        nueva_password_hash = usuario['password_hash']
+        current_password = datos_edicion.get('current_password', '')
+        new_password = datos_edicion.get('new_password', '')
+        confirm_new_password = datos_edicion.get('confirm_new_password', '')
+        
+        if new_password:
+            if not current_password:
+                return jsonify({
+                    "mensaje": "Debes proporcionar tu contraseña actual para cambiarla",
+                    "campo": "current_password",
+                    "success": False
+                }), 400
+            
+            if not bcrypt.checkpw(current_password.encode('utf-8'), usuario['password_hash'].encode('utf-8')):
+                return jsonify({
+                    "mensaje": "La contraseña actual es incorrecta",
+                    "campo": "current_password",
+                    "success": False
+                }), 400
+            
+
+            nueva_password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        with con.cursor() as cursor:
+            sql_update = """
+                UPDATE usuarios 
+                SET username = %s, password_hash = %s, rol = %s
+                WHERE id = %s
+            """
+            cursor.execute(sql_update, (nuevo_username, nueva_password_hash, nuevo_rol, user_id_editar))
+            con.commit()
+
+        return jsonify({
+            "mensaje": "Usuario actualizado correctamente",
+            "success": True,
+            "user": {
+                "id": user_id_editar,
+                "username": nuevo_username,
+                "rol": nuevo_rol
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({"mensaje": "Error interno del servidor", "success": False}), 500
+    finally:
+        if con:
+            try:
+                con.close()
+            except Exception as close_error:
+                logger.warning(f"Error al cerrar la conexión: {close_error}")
+
+@auth_bp.route("/api/obtenerUsuarios", methods=["GET"])
+@jwt_required()
+def obtener_usuarios():
+    con = None
+    try:
+        current_user_id = get_jwt_identity()
+        user_claims = get_jwt()
+        current_user_rol = user_claims.get('rol', 'usuario')
+        
+        con = conectar_db()
+        with con.cursor(dictionary=True) as cursor:
+            if current_user_rol == 'admin':
+                sql = "SELECT id, username, email, rol, estado, fecha_registro FROM usuarios"
+                cursor.execute(sql)
+            else:
+                sql = "SELECT id, username, email, rol, estado, fecha_registro FROM usuarios WHERE id = %s"
+                cursor.execute(sql, (current_user_id,))
+            
+            usuarios = cursor.fetchall()
+            
+            for usuario in usuarios:
+                usuario['avatar_url'] = f"https://robohash.org/ID={usuario['id']}"
+            
+            return jsonify({
+                "success": True,
+                "usuarios": usuarios,
+                "es_admin": current_user_rol == 'admin',
+                "current_user_id": current_user_id
+            }), 200
+
+    except Exception as e:
+        return jsonify({"mensaje": "Error interno del servidor", "success": False}), 500
+    finally:
+        if con:
+            try:
+                con.close()
+            except Exception as close_error:
+                logger.warning(f"Error al cerrar la conexión: {close_error}")
+
+@auth_bp.route("/api/eliminarUsuario/<int:user_id>", methods=["DELETE"])
+@jwt_required()
+def eliminar_usuario(user_id):
+    con = None
+    try:
+        current_user_id = get_jwt_identity()
+        user_claims = get_jwt()
+        current_user_rol = user_claims.get('rol', 'usuario')
+        
+        if current_user_rol != 'admin':
+            return jsonify({"mensaje": "No tienes permisos para esta acción", "success": False}), 403
+
+        con = conectar_db()
+        with con.cursor() as cursor:
+            sql_delete = "DELETE FROM usuarios WHERE id = %s"
+            cursor.execute(sql_delete, (user_id,))
+            con.commit()
+
+            if cursor.rowcount == 0:
+                return jsonify({"mensaje": "Usuario no encontrado", "success": False}), 404
+
+        return jsonify({"mensaje": "Usuario eliminado correctamente", "success": True}), 200
+
+    except Exception as e:
+        return jsonify({"mensaje": "Error interno del servidor", "success": False}), 500
+    finally:
+        if con:
+            try:
+                con.close()
+            except Exception as close_error:
+                logger.warning(f"Error al cerrar la conexión: {close_error}")
+
 @auth_bp.errorhandler(404)
 def not_found(e):
     return jsonify({"mensaje": "Recurso no encontrado"}), 404
-
 
 @auth_bp.errorhandler(500)
 def server_error(e):
     logger.error(f"Server error: {e}")
     return jsonify({"mensaje": "Error interno del servidor"}), 500
+
+

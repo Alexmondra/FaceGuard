@@ -5,10 +5,11 @@ CREATE TABLE  IF NOT EXISTS `personas` (
   `nombres` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `apellidos` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `fecha_nacimiento` date DEFAULT NULL,
-  `genero` varchar(1) NOT NULL,
+  `genero` varchar(1) DEFAULT NULL,
   `descripcion` text DEFAULT NULL,
-  `fecha_registro` datetime NOT NULL,
+  `fecha_registro` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_dni` (`dni`),
   CONSTRAINT `chk_genero` CHECK (`genero` in ('M','F'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 

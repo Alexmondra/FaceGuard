@@ -1,3 +1,4 @@
+<!-- detectados.html (modificado) -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -11,6 +12,23 @@
 <body>
     <div class="container-fluid py-4">
         <h1 class="text-center mb-4">Registro de Detecciones</h1>
+        
+        <!-- Buscador y filtros -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="searchDni" placeholder="Buscar por DNI..." class="form-control">
+
+                </div>
+            </div>
+            <div class="col-md-6">
+                <select id="cameraFilter" class="form-select" onchange="filterByCamera()">
+                    <option value="">Todas las cámaras</option>
+                    <!-- Las opciones se llenarán dinámicamente -->
+                </select>
+            </div>
+        </div>
         
         <div class="row">
             <div class="col-md-3">
@@ -54,7 +72,8 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <img id="modalDetectionImage" src="" class="img-fluid rounded person-info-img" alt="Detección">
+                            <h4>Imagen de la Detección</h4>
+                            <img id="modalDetectionImage" src="" class="img-fluid rounded mb-3" alt="Detección">
                         </div>
                         <div class="col-md-6">
                             <h4>Información de la Persona</h4>

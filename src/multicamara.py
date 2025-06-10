@@ -15,10 +15,7 @@ from seguimineto import personas_registradas ,calcular_distancia ,inicializar_mo
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('camera_threads.log'),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +48,8 @@ def listar_hilos_camaras():
             'last_frame': data.get('last_frame') is not None,
             'activo': data.get('activo', False),
             'running': data.get('running', False),
-            'last_activity': data.get('last_activity', 0)
+            'last_activity': data.get('last_activity', 0),
+            'seguimiento_activo': data.get('seguimiento_activo', False)
         } for cam_id, data in hilos_camaras.items()]
 
 
@@ -107,10 +105,8 @@ def cerrarhiloCamara(camara_id, timeout=3.0):
     except Exception as e:
         logger.error(f"Error crítico al cerrar hilo {camara_id}: {str(e)}")
         return False
-# Función que ejecuta el hilo para una cámara
-# --------------------------
-# NUEVAS FUNCIONES MODULARES
-# --------------------------
+    
+# Función que ejecuta el hilos multiples
 
 def conectar_camara(tipo_camara, fuente, stop_event):
     """Establece conexión con la cámara según su tipo"""
@@ -384,7 +380,7 @@ def hilo_camara(camara_id, nombre, tipo_camara, fuente, stop_event):
         
         except Exception as e:
             logger.error(f"[ERROR] {nombre}: {str(e)}")
-            #actualizar_estado_camara(camara_id, 'Inactivo')
+            actualizar_estado_camara(camara_id, 'Inactivo')
             time.sleep(1)
         
         finally:
@@ -428,8 +424,11 @@ def verificar_y_lanzar_camaras():
     conn = conectar_db()
     try:
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, nombre, tipo_camara, fuente FROM camaras")
-        
+        cursor.execute("""SELECT id, nombre, tipo_camara, fuente 
+                        FROM camaras 
+                        WHERE NOT (estado = 'Desactivado' OR 
+                        fecha_eliminacion IS NOT NULL)""")
+
         with hilos_lock:
             # Obtener cámaras que necesitan hilo nuevo
             camaras_para_lanzar = [
@@ -460,11 +459,12 @@ def verificar_y_lanzar_camaras():
                     'nombre': camara['nombre'],
                     'running': True,
                     'activo': False,
-                    'seguimiento_activo': True,
+                    'seguimiento_activo': False,
                     'terminating': False
                 }
+                logger.debug(f"Cámara añadida a hilos_camaras: {hilos_camaras[cam_id]}")
+
                 thread.start()
-                
     except Exception as e:
         logger.error(f"[MONITOR-ERROR] Error: {str(e)}")
     finally:
@@ -509,18 +509,30 @@ def handle_subscribe_camera(data):
 # Nuevos handlers para control por cámara
 @socketio.on('activar_seguimiento')
 def handle_activar_seguimiento(data):
-    camara_id = data.get('camera_id')
-    if camara_id:
-        with hilos_lock:
-            if camara_id in hilos_camaras:
-                hilos_camaras[camara_id]['seguimiento_activo'] = True
-        logger.info(f"Seguimiento activado para cámara {camara_id}")
+    camera_id_raw = data.get('camera_id')
+    if not camera_id_raw or not camera_id_raw.isdigit():
+        logger.warning(f"ID de cámara no válido recibido: {camera_id_raw}")
+        return
+    camara_id = int(camera_id_raw) 
+    with hilos_lock:
+        if not camara_id or camara_id not in hilos_camaras:
+            logger.warning(f"ID de cámara inválido o no encontrado: {camara_id}")
+            return
+        hilos_camaras[camara_id]['seguimiento_activo'] = True
+        logger.info(f"Seguimiento activado para cámara {camara_id}: {hilos_camaras[camara_id]}")
+
 
 @socketio.on('desactivar_seguimiento')
 def handle_desactivar_seguimiento(data):
-    camara_id = data.get('camera_id')
+    camera_id_raw = data.get('camera_id')
+    if not camera_id_raw or not camera_id_raw.isdigit():
+        logger.warning(f"ID de cámara no válido recibido: {camera_id_raw}")
+        return
+    camara_id = int(camera_id_raw) 
     if camara_id:
         with hilos_lock:
             if camara_id in hilos_camaras:
                 hilos_camaras[camara_id]['seguimiento_activo'] = False
-        logger.info(f"Seguimiento desactivado para cámara {camara_id}")
+                logger.info(f"Seguimiento desactivado para cámara {camara_id}")
+            else:
+                logger.warning(f"Cámara {camara_id} no encontrada en hilos_camaras")

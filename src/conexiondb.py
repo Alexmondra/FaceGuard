@@ -33,7 +33,12 @@ def poner_camaras_inactivas():
     conn = conectar_db()
     try:
         cursor = conn.cursor()
-        cursor.execute("UPDATE camaras SET estado = 'Inactivo'")
+        cursor.execute("""
+                UPDATE camaras 
+                SET estado = 'Inactivo' 
+                WHERE estado != 'Desactivado' 
+                AND fecha_eliminacion IS NULL
+            """)
         conn.commit()
         print("Todas las cámaras fueron marcadas como 'Inactivo'.")
     except Exception as e:

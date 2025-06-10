@@ -89,6 +89,9 @@ def serve_css(filename):
 # Inicializar FAISS cargando embeddings desde la base de datos
 cargar_todos_embeddings_faiss()
 
+#pasar a inactivas
+
+poner_camaras_inactivas()
 
 # Registrar el Blueprint de rutas_camaras - rutas_personas
 

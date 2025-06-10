@@ -16,7 +16,8 @@ import threading
 import queue
 import time
 from concurrent.futures import ThreadPoolExecutor
-
+import re
+from datetime import datetime
 
 # Crear un Blueprint
 rutas_personas = Blueprint('rutas_personas', __name__)
@@ -42,8 +43,10 @@ def obtener_datos_persona(persona_id):
 
 def crear_carpeta_persona(dni):
     carpeta = os.path.join(IMAGES_DIR, secure_filename(dni))
-    os.makedirs(carpeta, exist_ok=True)
+    if not os.path.exists(carpeta):
+        os.makedirs(carpeta, exist_ok=True)
     return carpeta
+
 
 def guardar_embedding_db(persona_id, embedding, tipo, descripcion, ruta_imagen):
     conexion = conectar_db()
@@ -190,58 +193,119 @@ def worker():
 for _ in range(MAX_WORKERS):
     threading.Thread(target=worker, daemon=True).start()
 
-# --------------------------
-# Rutas del Blueprint
-# --------------------------
+
 
 @rutas_personas.route("/agregar_persona", methods=["POST"])
 @jwt_required()
 def agregar_persona_async():
     try:
+        # Validación de datos básica
         dni = request.form.get("idNumber", "").strip()
         nombres = request.form.get("fullName", "").strip()
-        apellidos = request.form.get("lastName", "").strip()
-        sexo = request.form.get("idSexo", "").strip()
-        fecha_nac = request.form.get("idFecha", "").strip()
-        descripcion = request.form.get("physicDescription", "").strip()
-        
         if not dni or not nombres:
             return jsonify({"error": "DNI y nombres son obligatorios"}), 400
 
-        conexion = conectar_db() 
+        # Obtener demás datos
+        datos_persona = {
+            'apellidos': request.form.get("lastName", "").strip(),
+            'sexo': request.form.get("idSexo", "").strip(),
+            'fecha_nac': request.form.get("idFecha", "").strip(),
+            'descripcion': request.form.get("physicDescription", "").strip()
+        }
+
+        conexion = conectar_db()
+        persona_id = None
+        carpeta_dni = None
+        imagenes_procesadas = 0
+
         try:
             with conexion.cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO personas 
-                    (dni, nombres, apellidos, fecha_nacimiento, genero, descripcion, fecha_registro)
-                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                    RETURNING id
-                """, (dni, nombres, apellidos, fecha_nac, sexo, descripcion))
-                persona_id = cursor.fetchone()[0]
+                # Verificar existencia del DNI
+                cursor.execute("SELECT id FROM personas WHERE dni = %s", (dni,))
+                existing_person = cursor.fetchone()
+                
+                if existing_person:
+                    # Actualizar persona existente
+                    persona_id = existing_person[0]
+                    cursor.execute("""
+                        UPDATE personas 
+                        SET nombres = %s,
+                            apellidos = %s,
+                            fecha_nacimiento = %s,
+                            genero = %s,
+                            descripcion = %s,
+                            fecha_registro = NOW()
+                        WHERE id = %s
+                    """, (nombres, datos_persona['apellidos'], datos_persona['fecha_nac'], 
+                          datos_persona['sexo'], datos_persona['descripcion'], persona_id))
+                    
+                    # Manejo de carpeta existente
+                    carpeta_dni = crear_carpeta_persona(dni)
+                else:
+                    # Insertar nueva persona
+                    cursor.execute("""
+                        INSERT INTO personas 
+                        (dni, nombres, apellidos, fecha_nacimiento, genero, descripcion, fecha_registro)
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                        RETURNING id
+                    """, (dni, nombres, datos_persona['apellidos'], datos_persona['fecha_nac'],
+                          datos_persona['sexo'], datos_persona['descripcion']))
+                    persona_id = cursor.fetchone()[0]
+                    
+                    # Crear carpeta para nuevo DNI
+                    carpeta_dni = crear_carpeta_persona(dni)
+
             conexion.commit()
+
+            # Procesamiento de imágenes
+            imagenes = request.files.getlist("photos")
+            for i, img in enumerate(imagenes, 1):
+                try:
+                    if img.filename:  # Solo procesar si tiene nombre
+                        img_bytes = img.read()
+                        # Nombre único para la imagen
+                        timestamp = int(time.time())
+                        extension = os.path.splitext(img.filename)[1].lower()
+                        nombre_imagen = f"{timestamp}_{i}{extension}"
+                        
+                        processing_queue.put(('procesar_imagen', img_bytes, persona_id, carpeta_dni, nombre_imagen))
+                        imagenes_procesadas += 1
+                except Exception as img_error:
+                    current_app.logger.error(f"Error procesando imagen {i}: {str(img_error)}")
+
+            return jsonify({
+                "status": "success",
+                "message": "Procesamiento iniciado correctamente",
+                "persona_id": persona_id,
+                "dni": dni,
+                "imagenes_recibidas": len(imagenes),
+                "imagenes_procesadas": imagenes_procesadas,
+                "carpeta": os.path.basename(carpeta_dni),
+                "registro_existente": existing_person is not None,
+                "timestamp": datetime.now().isoformat()
+            }), 202
+
+        except Exception as db_error:
+            conexion.rollback()
+            current_app.logger.error(f"Error en base de datos: {str(db_error)}")
+            return jsonify({
+                "status": "error",
+                "message": "Error al procesar el registro",
+                "detalle": str(db_error)
+            }), 500
+
         finally:
-            conexion.close()
-
-        carpeta_dni = crear_carpeta_persona(dni)
-        
-        imagenes = request.files.getlist("photos")
-        for i, img in enumerate(imagenes, 1):
-            img_bytes = img.read()
-            processing_queue.put(('procesar_imagen', img_bytes, persona_id, carpeta_dni, i))
-
-        return jsonify({
-            "status": "success",
-            "message": "Registro iniciado. Las imágenes se están procesando en segundo plano",
-            "persona_id": persona_id,
-            "imagenes_recibidas": len(imagenes),
-            "tiempo_respuesta": f"{time.process_time():.3f} segundos"
-        }), 202
+            if conexion:
+                conexion.close()
 
     except Exception as e:
+        current_app.logger.error(f"Error general: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": str(e)
+            "message": "Error inesperado en el servidor",
+            "detalle": str(e)
         }), 500
+
 
 @rutas_personas.route('/editar_persona/<int:persona_id>', methods=['PUT'])
 @jwt_required()
@@ -341,30 +405,6 @@ def editar_persona(persona_id):
     finally:
         if conexion:
             conexion.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ## obtener personas :: 
@@ -511,3 +551,89 @@ def eliminar_persona(id):
             conexion.close()
         return jsonify({"error": f"Error al eliminar: {str(e)}"}), 500
 
+
+
+
+@rutas_personas.route("/cargar_carpeta_personas", methods=["POST"])
+@jwt_required()
+def cargar_carpeta_personas():
+    try:
+        if 'files[]' not in request.files:
+            return jsonify({"error": "No se recibió ninguna carpeta"}), 400
+        
+        archivos = request.files.getlist('files[]')
+        if not archivos or all(not archivo.filename for archivo in archivos):
+            return jsonify({"error": "La carpeta está vacía o los nombres de archivos son inválidos"}), 400
+
+        personas_archivos = {}
+        dni_invalidos = []
+        
+        for archivo in archivos:
+            filename = secure_filename(archivo.filename)
+            dni = os.path.splitext(filename)[0].strip()
+            dni_match = re.match(r'^[a-zA-Z_]*?(\d{8})$', dni)
+            if dni_match:
+                dni = dni_match.group(1) 
+            else:
+                dni_invalidos.append(filename)
+                continue
+
+            if dni not in personas_archivos:
+                personas_archivos[dni] = []
+            personas_archivos[dni].append(archivo)
+
+        if dni_invalidos:
+            return jsonify({
+                "error": "Algunos archivos no tienen nombres válidos (DNI de 8 dígitos)",
+                "archivos_invalidos": dni_invalidos
+            }), 400
+
+        resultados = []
+        for dni, archivos in personas_archivos.items():
+            conexion = conectar_db()
+            try:
+                with conexion.cursor(buffered=True) as cursor:  
+                    # Insertar o ignorar si ya existe
+                    cursor.execute("""
+                        INSERT IGNORE INTO personas (dni, fecha_registro)
+                        VALUES (%s, NOW())
+                    """, (dni,))
+                    
+                    # Obtener el ID (nuevo o existente)
+                    cursor.execute("SELECT id FROM personas WHERE dni = %s", (dni,))
+                    persona_id = cursor.fetchone()[0]
+                
+                conexion.commit()
+            except Exception as e:
+                conexion.rollback()
+                return jsonify({"error": f"Error al registrar/obtener persona {dni}: {str(e)}"}), 500
+            finally:
+                conexion.close()
+
+            carpeta_dni = crear_carpeta_persona(dni)
+            
+            for i, img in enumerate(archivos, 1):
+                img_bytes = img.read()
+                processing_queue.put(('procesar_imagen', img_bytes, persona_id, carpeta_dni, i))
+
+            resultados.append({
+                "dni": dni,
+                "persona_id": persona_id,
+                "imagenes_recibidas": len(archivos),
+                "status": "encolado"
+            })
+
+        return jsonify({
+            "status": "success",
+            "message": "Procesamiento iniciado en segundo plano",
+            "personas_procesadas": len(resultados),
+            "detalles": resultados,
+            "timestamp": datetime.now().isoformat()
+        }), 202
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500

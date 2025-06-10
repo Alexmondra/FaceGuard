@@ -1,0 +1,239 @@
+
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carga de Documentos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            background-color: #fafafa;
+        }
+        .upload-section:hover {
+            border-color: #999;
+        }
+        .folder-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #4CAF50;
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .error-box {
+            background-color: #f8d7da;
+            border-left: 5px solid #dc3545;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .warning-title {
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        .error-title {
+            font-weight: bold;
+            color: #721c24;
+            margin-bottom: 10px;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        #fileInput {
+            display: none;
+        }
+        .file-list {
+            margin-top: 20px;
+            width: 100%;
+        }
+        .file-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .file-count {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Carga de Documentos</h1>
+        
+        <div class="warning-box">
+            <div class="warning-title">⚠️ Requisitos importantes</div>
+            <p>1. El nombre de cada archivo debe ser el DNI de la persona (ejemplo: "12345678.jpg").</p>
+            <p>2. El número máximo total de archivos permitidos es 100, sin importar cuántas carpetas selecciones.</p>
+            <p>El sistema validará estos requisitos antes de procesar los archivos.</p>
+        </div>
+        
+        <div class="upload-section" id="dropArea">
+            <div class="folder-icon">📁</div>
+            <p>Arrastra y suelta carpetas aquí o haz clic para seleccionar</p>
+            <input type="file" id="fileInput" webkitdirectory directory multiple>
+            <button class="btn" onclick="document.getElementById('fileInput').click()">Seleccionar Carpeta(s)</button>
+        </div>
+        
+        <div class="file-list" id="fileList">
+            <p>Archivos seleccionados aparecerán aquí</p>
+        </div>
+        
+        <div class="file-count" id="fileCount">0 archivos seleccionados</div>
+        
+        <button class="btn" style="width: 100%;" id="uploadBtn" disabled>Procesar Archivos</button>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const dropArea = document.getElementById('dropArea');
+            const fileInput = document.getElementById('fileInput');
+            const fileList = document.getElementById('fileList');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const fileCount = document.getElementById('fileCount');
+        
+            let selectedFiles = [];
+            const MAX_FILES = 100;
+        
+            // Manejar eventos de arrastrar y soltar
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+        
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(true), false);
+            });
+        
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(false), false);
+            });
+        
+            function toggleHighlight(highlight) {
+                dropArea.style.borderColor = highlight ? '#4CAF50' : '#ccc';
+                dropArea.style.backgroundColor = highlight ? '#e8f5e9' : '#fafafa';
+            }
+        
+            dropArea.addEventListener('drop', handleDrop, false);
+        
+            function handleDrop(e) {
+                processFiles(e.dataTransfer.files);
+            }
+        
+            fileInput.addEventListener('change', () => {
+                processFiles(fileInput.files);
+            });
+        
+            function processFiles(files) {
+                const newFiles = Array.from(files);
+                
+                // Verificar límite de archivos
+                if (selectedFiles.length + newFiles.length > MAX_FILES) {
+                    alert(`Límite excedido: Solo puedes cargar un máximo de ${MAX_FILES} archivos.`);
+                    return;
+                }
+        
+                newFiles.forEach(file => {
+                    const fileName = file.name.split('.')[0].trim(); // Obtener nombre sin extensión
+                    const isValid = /^\d{8}$/.test(fileName);
+                    selectedFiles.push({ file, isValid });
+                });
+        
+                updateUI();
+            }
+        
+            function updateUI() {
+                fileList.innerHTML = '<h3>Archivos seleccionados:</h3>';
+                fileCount.textContent = `${selectedFiles.length} archivos seleccionados (Máximo: ${MAX_FILES})`;
+        
+                selectedFiles.forEach(({ file, isValid }) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.textContent = `${file.name} - ${isValid ? '✅ Válido' : '❌ Inválido (no es DNI)'}`;
+                    fileList.appendChild(fileItem);
+                });
+        
+                uploadBtn.disabled = selectedFiles.length === 0 || selectedFiles.some(f => !f.isValid);
+            }
+        
+            uploadBtn.addEventListener('click', () => {
+                const validFiles = selectedFiles.filter(f => f.isValid);
+        
+                if (validFiles.length === 0) {
+                    alert("No hay archivos válidos para enviar.");
+                    return;
+                }
+        
+                const formData = new FormData();
+                validFiles.forEach(({ file }) => formData.append('files[]', file));
+        
+                uploadBtn.disabled = true;
+                uploadBtn.textContent = "Enviando...";
+        
+                fetch(`${API_BASE_URL}/registros/cargar_carpeta_personas`, {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "Authorization": `Bearer ${localStorage.getItem("accessToken")}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(`Éxito: ${data.message}\nPersonas procesadas: ${data.personas_procesadas}`);
+                    selectedFiles = [];
+                    updateUI();
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    alert(`Error al procesar archivos: ${error.message}`);
+                })
+                .finally(() => {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = "Procesar Archivos";
+                });
+            });
+        });
+        
+    </script>
+</body>
+</html>
